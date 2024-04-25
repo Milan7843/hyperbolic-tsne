@@ -7,6 +7,7 @@
 # The implementation is based on the tSNE code from Christopher Moody and 
 # and Nick Travers available at https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/manifold/_barnes_hut_tsne.pyx
 import numpy as np
+include "gpu.py"
 cimport numpy as np
 from libc.stdio cimport printf
 from libc.math cimport sqrt, log, acosh, cosh, cos, sin, M_PI, atan2, tanh, atanh, isnan, fabs, fmin, fmax
@@ -1308,6 +1309,14 @@ def gradient(float[:] timings,
 
     global GRAD_FIX
     GRAD_FIX = grad_fix
+
+
+    positions_arr = np.asarray(pos_output)
+    print("pos shape: ", positions_arr.shape)
+    print("pos min: ", np.min(positions_arr))
+    print("pos max: ", np.max(positions_arr))
+
+    gpu_init()
 
     if not exact:
         if TAKE_TIMING:

@@ -229,10 +229,12 @@ def gradient_descent(
             logging_dict[logging_key]["gradients"] = []
         else:
             log_arrays_ids = None
-        print("[gradient_descent] Warning: because of logging, the cf will be computed at every iteration")
+        print("[gradient_descent] Warning!: because of logging, the cf will be computed at every iteration")
         logging = True  # when logging True, data from every iteration will be gathered, but not used to assess convergence criteria
         tic_l = time()
     # End: logging
+
+    print("performing gradient descent!")
 
     tic = time()
     i = start_it-1
@@ -242,8 +244,10 @@ def gradient_descent(
         # only compute the error when needed
         compute_error = check_convergence or check_threshold or i == n_iter - 1
 
+        
         if compute_error or logging:  # TODO: add different levels of logging to avoid bottlenecks
             error, grad = cf.obj_grad(y, **cf_params)
+            print("calling obj_grad")
 
             if isinstance(cf, HyperbolicKL):
                 # New Fix
@@ -256,6 +260,7 @@ def gradient_descent(
             else:
                 grad_norm = linalg.norm(grad)
         else:
+            print("calling grad")
             grad = cf.grad(y, **cf_params)
             grad_norm = linalg.norm(grad)
 
