@@ -1,191 +1,90 @@
-from cuda import cuda, nvrtc
+import pycuda.autoinit
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 import numpy as np
-import os
-import ctypes
 
-exact_compute_gradient_negative_ptx = None
-cuDevice = None
-context = None
-kernel = None
-
-def gpu_reset():
-    global cuDevice
-    global context
-    global kernel
-    global exact_compute_gradient_negative_ptx
-
-    exact_compute_gradient_negative_ptx = None
-    cuDevice = None
-    context = None
-    kernel = None
+exact_compute_gradient_negative_gpu_func = None
 
 def gpu_init():
-    global cuDevice
-    global context
-    global kernel
+    with open("gpu_code\exact_negative_gradient.cu", "r") as file:
+        cuda_kernel = file.read()
 
-    #if cuDevice != None:
-        #return
+    # Compile the CUDA kernel
+    mod = SourceModule(cuda_kernel)
 
-    print("========== RUNNING GPU CODE ==========")
+    # Get the kernel function
+    add_cuda = mod.get_function("add")
 
-    # Initialize CUDA Driver API
-    err, = cuda.cuInit(0)
+    # Example usage
+    a = np.array([1, 2, 3])
+    b = np.array([4, 5, 6])
+    c = np.zeros_like(a)
 
-    # Retrieve handle for device 0
-    err, cuDevice = cuda.cuDeviceGet(0)
+    # Allocate GPU memory
+    a_gpu = cuda.mem_alloc(a.nbytes)
+    b_gpu = cuda.mem_alloc(b.nbytes)
+    c_gpu = cuda.mem_alloc(c.nbytes)
 
-    # Create context
-    err, context = cuda.cuCtxCreate(0, cuDevice)
+    # Transfer data to GPU memory
+    cuda.memcpy_htod(a_gpu, a)
+    cuda.memcpy_htod(b_gpu, b)
 
-    # Load PTX as module data and retrieve function
-    ptx = np.char.array(get_exact_compute_gradient_negative_ptx())
-    # Note: Incompatible --gpu-architecture would be detected here
-    err, module = cuda.cuModuleLoadData(ptx.ctypes.data)
-    ASSERT_DRV(err, "1")
-    err, kernel = cuda.cuModuleGetFunction(module, b"saxpy")
-    ASSERT_DRV(err, "2")
+    # Launch the CUDA kernel
+    print("c0: ", c)
+    add_cuda(a_gpu, b_gpu, c_gpu, block=(3, 1, 1), grid=(1, 1))
+    print("c1: ", c)
+    # Transfer results back to CPU
+    cuda.memcpy_dtoh(c, c_gpu)
 
-    NUM_THREADS = 512  # Threads per block
-    NUM_BLOCKS = 16  # Blocks per grid
+    print("c:  ", c)  # Output: [5 7 9]
 
-    a = np.array([2.0], dtype=np.float32)
-    n = np.array(NUM_THREADS * NUM_BLOCKS, dtype=np.uint32)
-    bufferSize = n * a.itemsize
+def get_exact_compute_gradient_negative_gpu_func():
+    global exact_compute_gradient_negative_gpu_func
 
-    hX = np.random.rand(n).astype(dtype=np.float32)
-    hY = np.random.rand(n).astype(dtype=np.float32)
-    hOut = np.zeros(n).astype(dtype=np.float32)
+    if (exact_compute_gradient_negative_gpu_func == None):
+        with open("gpu_code\exact_negative_gradient.cu", "r") as file:
+            cuda_kernel = file.read()
 
+        # Compile the CUDA kernel
+        mod = SourceModule(cuda_kernel)
 
-    err, dXclass = cuda.cuMemAlloc(bufferSize)
-    err, dYclass = cuda.cuMemAlloc(bufferSize)
-    err, dOutclass = cuda.cuMemAlloc(bufferSize)
-
-    err, stream = cuda.cuStreamCreate(0)
-
-    err, = cuda.cuMemcpyHtoDAsync(
-        dXclass, hX.ctypes.data, bufferSize, stream
-    )
-    err, = cuda.cuMemcpyHtoDAsync(
-        dYclass, hY.ctypes.data, bufferSize, stream
-    )
-
-    # The following code example is not intuitive 
-    # Subject to change in a future release
-    dX = np.array([int(dXclass)], dtype=np.uint64)
-    dY = np.array([int(dYclass)], dtype=np.uint64)
-    dOut = np.array([int(dOutclass)], dtype=np.uint64)
-
-    args = [a, dX, dY, dOut, n]
-    args = np.array([arg.ctypes.data for arg in args], dtype=np.uint64)
-
-    err, = cuda.cuLaunchKernel(
-        kernel,
-        NUM_BLOCKS,  # grid x dim
-        1,  # grid y dim
-        1,  # grid z dim
-        NUM_THREADS,  # block x dim
-        1,  # block y dim
-        1,  # block z dim
-        0,  # dynamic shared memory
-        stream,  # stream
-        args.ctypes.data,  # kernel arguments
-        0,  # extra (ignore)
-    )
-
-    err, = cuda.cuMemcpyDtoHAsync(
-        hOut.ctypes.data, dOutclass, bufferSize, stream
-    )
-    err, = cuda.cuStreamSynchronize(stream)
-
-    # Assert values are same after running kernel
-    hZ = a * hX + hY
-    if not np.allclose(hOut, hZ):
-        raise ValueError("Error outside tolerance for host-device vectors")
+        # Get the kernel function
+        exact_compute_gradient_negative_gpu_func = mod.get_function("add")
     
-    print("========== SUCCESS ==========")
-    print(zip(hOut, hZ))
-    
-    err, = cuda.cuStreamDestroy(stream)
-    err, = cuda.cuMemFree(dXclass)
-    err, = cuda.cuMemFree(dYclass)
-    err, = cuda.cuMemFree(dOutclass)
-    err, = cuda.cuModuleUnload(module)
-    err, = cuda.cuCtxDestroy(context)
+    return exact_compute_gradient_negative_gpu_func
 
-def get_exact_compute_gradient_negative_ptx():
-    global exact_compute_gradient_negative_ptx
+def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples):
 
-    if exact_compute_gradient_negative_ptx == None:
-        exact_compute_gradient_negative_ptx = compile_cuda_code("gpu_code\exact_negative_gradient.cu")
+    # Allocate memory for neg_f and sumQs
+    neg_f = np.zeros(n_samples * n_dimensions, dtype=np.double)
+    sumQs = np.zeros(n_samples, dtype=np.double)
 
-    return exact_compute_gradient_negative_ptx
+    # Convert pos and neg_f to ctypes pointers
+    pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
+    negf_gpu = cuda.mem_alloc(neg_f.nbytes)
+    sumQs_gpu = cuda.mem_alloc(sumQs.nbytes)
 
-def ASSERT_DRV(err, marker=""):
-    if isinstance(err, cuda.CUresult):
-        if err != cuda.CUresult.CUDA_SUCCESS:
-            raise RuntimeError("Cuda Error ({}): {}".format(err, marker))
-    elif isinstance(err, nvrtc.nvrtcResult):
-        if err != nvrtc.nvrtcResult.NVRTC_SUCCESS:
-            raise RuntimeError("Nvrtc Error ({}): {}".format(err, marker))
-    else:
-        raise RuntimeError("Unknown error type: {}".format(err))
-    
-    
-def compile_cuda_code(file_path):
-    # Read CUDA code from file
-    with open(file_path, 'r') as file:
-        cuda_code = file.read()
+    cuda.memcpy_htod(pos_gpu, pos_reference)
+    cuda.memcpy_htod(negf_gpu, neg_f)
+    cuda.memcpy_htod(sumQs_gpu, sumQs)
 
-    saxpy = """\
-    extern "C" __global__
-    void saxpy(float a, float *x, float *y, float *out, size_t n)
-    {
-        size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-        if (tid < n) {
-            out[tid] = a * x[tid] + y[tid];
-        }
-    }
-    """
+    block_size = 256
+    num_blocks = (n_samples + block_size - 1) // block_size
 
-    print("code:")
-    print(cuda_code)
-    print("code 2:")
-    print(saxpy)
+    cuda_func = get_exact_compute_gradient_negative_gpu_func()
 
-    # Create program
-    err, prog = nvrtc.nvrtcCreateProgram(str.encode(saxpy), b"saxpy.cu", 0, [], [])
-    ASSERT_DRV(err, "4")
+    # Call the CUDA kernel
+    # You would need to modify this part to fit your actual CUDA kernel invocation
+    cuda_func(np.int32(start), np.int32(n_samples), np.int32(n_dimensions), pos_gpu, negf_gpu, sumQs_gpu, block=(block_size, 1, 1), grid=(num_blocks, 1))
 
-    # Compile program
-    opts = [b"--fmad=false", b"--gpu-architecture=compute_75"]
-    err, = nvrtc.nvrtcCompileProgram(prog, 2, opts)
-    ASSERT_DRV(err, "5")
 
-    # Get PTX from compilation
-    err, ptxSize = nvrtc.nvrtcGetPTXSize(prog)
-    ASSERT_DRV(err, "6")
-    ptx = b" " * ptxSize
-    err, = nvrtc.nvrtcGetPTX(prog, ptx)
-    ASSERT_DRV(err, "7")
 
-    return ptx
+    # Transfer results back to CPU
+    cuda.memcpy_dtoh(neg_f, negf_gpu)
+    cuda.memcpy_dtoh(sumQs, sumQs_gpu)
 
-    # Create program
-    err, prog = nvrtc.nvrtcCreateProgram(str.encode(cuda_code), os.path.basename(file_path).encode(), 0, [], [])
+    sQ = np.sum(sumQs)
 
-    # Compile program
-    opts = [b"--fmad=false", b"--gpu-architecture=compute_75"]
-    err, = nvrtc.nvrtcCompileProgram(prog, len(opts), opts)
-
-    if err != 0:
-        log = nvrtc.nvrtcGetProgramLogSize(prog)
-        info = ctypes.create_string_buffer(log)
-        nvrtc.nvrtcGetProgramLog(prog, info)
-        raise RuntimeError("Compilation failed:\n{}".format(info.value.decode()))
-
-    # Get PTX from compilation
-    err, ptxSize = nvrtc.nvrtcGetPTXSize(prog)
-    ptx = b" " * ptxSize
-    err, = nvrtc.nvrtcGetPTX(prog, ptx)
+    #print("negf: ", neg_f)  # Output: [5 7 9]
+    #print("sq: ", sQ)  # Output: [5 7 9]
+    return neg_f, sQ

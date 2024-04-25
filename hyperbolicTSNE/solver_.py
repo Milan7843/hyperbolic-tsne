@@ -247,7 +247,6 @@ def gradient_descent(
         
         if compute_error or logging:  # TODO: add different levels of logging to avoid bottlenecks
             error, grad = cf.obj_grad(y, **cf_params)
-            print("calling obj_grad")
 
             if isinstance(cf, HyperbolicKL):
                 # New Fix
