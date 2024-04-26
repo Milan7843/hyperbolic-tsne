@@ -127,14 +127,14 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
 
     # Allocate memory for neg_f and sumQs
     neg_f = np.zeros(n_samples * n_dimensions, dtype=np.double)
-    sumQs = np.zeros(n_samples, dtype=np.double)
+    sumQ = np.zeros(1, dtype=np.double)
 
     start_time = time.time()
 
     # Convert pos and neg_f to ctypes pointers
     pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
     negf_gpu = cuda.mem_alloc(neg_f.nbytes)
-    sumQs_gpu = cuda.mem_alloc(sumQs.nbytes)
+    sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
 
     end_time = time.time()
 
@@ -145,7 +145,7 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
 
     cuda.memcpy_htod(pos_gpu, pos_reference)
     cuda.memcpy_htod(negf_gpu, neg_f)
-    cuda.memcpy_htod(sumQs_gpu, sumQs)
+    cuda.memcpy_htod(sumQ_gpu, sumQ)
 
     end_time = time.time()
 
@@ -161,31 +161,28 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
 
     # Call the CUDA kernel
     # You would need to modify this part to fit your actual CUDA kernel invocation
-    cuda_func(np.int32(start), np.int32(n_samples), np.int32(n_dimensions), pos_gpu, negf_gpu, sumQs_gpu, block=(block_size, 1, 1), grid=(num_blocks, 1))
+    cuda_func(np.int32(start), np.int32(n_samples), np.int32(n_dimensions), pos_gpu, negf_gpu, sumQ_gpu, block=(block_size, 1, 1), grid=(num_blocks, 1))
 
     end_time = time.time()
 
     execution_time = end_time - start_time
     print("Run: ", execution_time, "seconds")
 
-
     start_time = time.time()
 
     # Transfer results back to CPU
     cuda.memcpy_dtoh(neg_f, negf_gpu)
-    cuda.memcpy_dtoh(sumQs, sumQs_gpu)
+    cuda.memcpy_dtoh(sumQ, sumQ_gpu)
 
     end_time = time.time()
 
     execution_time = end_time - start_time
     print("Copy back: ", execution_time, "seconds")
-
-    sQ = np.sum(sumQs)
     
     end_time = time.time()
     execution_time = end_time - total_start_time
     print("Total: ", execution_time, "seconds")
 
     #print("negf: ", neg_f)  # Output: [5 7 9]
-    #print("sq: ", sQ)  # Output: [5 7 9]
-    return neg_f, sQ
+    print("sumQ: ", sumQ[0])
+    return neg_f, sumQ[0]

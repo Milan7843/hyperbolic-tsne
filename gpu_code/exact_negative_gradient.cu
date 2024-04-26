@@ -61,7 +61,7 @@ __device__ double distance_grad(double u0, double u1, double v0, double v1, int 
     return shared_scalar * (u_scalar * u1 - v_scalar * v1);
 }
 
-__global__ void add(int start, int n_samples, int n_dimensions, double *pos, double *neg_f, double *sumQs) {
+__global__ void add(int start, int n_samples, int n_dimensions, double *pos, double *neg_f, double *sumQ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i > n_samples) {
@@ -71,7 +71,9 @@ __global__ void add(int start, int n_samples, int n_dimensions, double *pos, dou
     double qij = 0.0;
     double dij = 0.0;
     double dij_sq = 0.0;
+    double thread_sQ = 0.0;
 
+    
     for (int j = start; j < n_samples; j++) {
         if (i == j) {
             continue;
@@ -84,17 +86,7 @@ __global__ void add(int start, int n_samples, int n_dimensions, double *pos, dou
 
         double mult = qij * qij;
 
-        /*
-        if (true) {
-            // New Fix
-            mult = qij * qij * dij;
-        }
-        else {
-            // Old Solution
-            mult = qij * qij;
-        }*/
-
-        sumQs[i] += qij;
+        thread_sQ += qij;
         for (int ax = 0; ax < n_dimensions; ax++) {
             neg_f[i * n_dimensions + ax] += mult * distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
             //neg_f[i * n_dimensions + ax] = distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
@@ -103,4 +95,7 @@ __global__ void add(int start, int n_samples, int n_dimensions, double *pos, dou
             //neg_f[i * n_dimensions + ax] = distance_grad(0.1, -0.1, 0.3, 0.5, 0);
         }
     }
+    
+
+    atomicAdd(sumQ, thread_sQ);
 }
