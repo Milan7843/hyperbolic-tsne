@@ -234,8 +234,6 @@ def gradient_descent(
         tic_l = time()
     # End: logging
 
-    print("performing gradient descent!")
-
     tic = time()
     i = start_it-1
     for i in (pbar := tqdm(range(i+1, total_its), "Gradient Descent")):
@@ -259,7 +257,6 @@ def gradient_descent(
             else:
                 grad_norm = linalg.norm(grad)
         else:
-            print("calling grad")
             grad = cf.grad(y, **cf_params)
             grad_norm = linalg.norm(grad)
 
