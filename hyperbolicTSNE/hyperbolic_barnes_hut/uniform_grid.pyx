@@ -10,8 +10,9 @@ from libc.stdlib cimport malloc, free
 np.import_array()
 
 def py_divide_points_over_grid(points, n):
+    cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
-    cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(grid_size, dtype=np.int32)
+    cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(num_points, dtype=np.int32)
     cdef np.ndarray[np.int32_t, ndim=1] result_starts_counts = np.empty((grid_size * 2), dtype=np.int32)
     c_divide_points_over_grid(points, n, result_indices, result_starts_counts)
     return result_indices, result_starts_counts
@@ -32,17 +33,24 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n, np.ndarray[np.int
 
     # ======= STEP 1 =======
     
-    cdef int* indices = <int*>malloc(sizeof(int) * num_points)
+    cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
     for p in range(num_points):
-        x = points[p, 0]
-        y = points[p, 1]
+        x = points[p, 0] # valid
+        y = points[p, 1] # valid
 
         i = int((x + 1.0) / grid_width)
         j = int((y + 1.0) / grid_width)
 
         index = i * n + j
 
-        indices[p] = index
+        if (index < 0):
+            index = 0
+        
+        if (index >= grid_size):
+            index = grid_size-1
+        
+
+        indices[p] = index # valid
 
 
     # ======= STEP 2 =======
@@ -77,10 +85,12 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n, np.ndarray[np.int
     # ======= STEP 4 =======
 
     for p in range(num_points):
-        index = indices[p]
+        index = indices[p] # valid
 
         # Moving the current pointer over
-        result_indices[grid_start_indices[index]] = p
+        result_index = grid_start_indices[index]
+
+        result_indices[result_index] = p
         grid_start_indices[index] += 1
 
     
