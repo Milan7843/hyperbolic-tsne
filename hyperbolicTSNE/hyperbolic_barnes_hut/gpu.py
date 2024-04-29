@@ -3,9 +3,11 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 import numpy as np
 import time
+from . import uniform_grid
 
 exact_compute_gradient_negative_gpu_func = None
 exact_compute_gradient_positive_gpu_func = None
+ugrid_compute_gradient_negative_gpu_func = None
 
 def get_exact_compute_gradient_negative_gpu_func():
     global exact_compute_gradient_negative_gpu_func
@@ -36,6 +38,21 @@ def get_exact_compute_gradient_positive_gpu_func():
         exact_compute_gradient_positive_gpu_func = mod.get_function("add")
     
     return exact_compute_gradient_positive_gpu_func
+
+def get_ugrid_compute_gradient_negative_gpu_func():
+    global ugrid_compute_gradient_negative_gpu_func
+
+    if (ugrid_compute_gradient_negative_gpu_func == None):
+        with open("gpu_code/u_grid_negative_gradient.cu", "r") as file:
+            cuda_kernel = file.read()
+
+        # Compile the CUDA kernel
+        mod = SourceModule(cuda_kernel)
+
+        # Get the kernel function
+        ugrid_compute_gradient_negative_gpu_func = mod.get_function("add")
+    
+    return ugrid_compute_gradient_negative_gpu_func
 
 def compute_gradient_positive_gpu(start, pos_reference, n_dimensions, n_samples, sumQ, neighbours, indptr, val_P):
 
@@ -121,6 +138,103 @@ def compute_gradient_positive_gpu(start, pos_reference, n_dimensions, n_samples,
     return pos_f, error
 
 
+def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples):
+
+    total_start_time = time.time()
+
+    # Allocate memory for neg_f and sumQs
+    neg_f = np.zeros(n_samples * n_dimensions, dtype=np.double)
+    sumQ = np.zeros(1, dtype=np.double)
+
+    start_time = time.time()
+    grid_n = 30
+    grid_size = grid_n*grid_n
+    result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("Grid generation: ", execution_time, "seconds")
+
+    start_time = time.time()
+
+    # Convert pos and neg_f to ctypes pointers
+    pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
+    negf_gpu = cuda.mem_alloc(neg_f.nbytes)
+    sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
+    result_indices_gpu = cuda.mem_alloc(result_indices.nbytes)
+    result_starts_counts_gpu = cuda.mem_alloc(result_starts_counts.nbytes)
+    max_distances_gpu = cuda.mem_alloc(max_distances.nbytes)
+    square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
+
+    end_time = time.time()
+
+    execution_time = end_time - start_time
+    #print("Mem alloc: ", execution_time, "seconds")
+
+    start_time = time.time()
+
+    cuda.memcpy_htod(pos_gpu, pos_reference)
+    cuda.memcpy_htod(negf_gpu, neg_f)
+    cuda.memcpy_htod(sumQ_gpu, sumQ)
+    cuda.memcpy_htod(result_indices_gpu, result_indices)
+    cuda.memcpy_htod(result_starts_counts_gpu, result_starts_counts)
+    cuda.memcpy_htod(max_distances_gpu, max_distances)
+    cuda.memcpy_htod(square_positions_gpu, square_positions)
+
+    end_time = time.time()
+
+    execution_time = end_time - start_time
+    #print("Mem copy: ", execution_time, "seconds")
+
+    block_size = 256
+    num_blocks = (n_samples + block_size - 1) // block_size
+
+    cuda_func = get_ugrid_compute_gradient_negative_gpu_func()
+
+    start_time = time.time()
+
+    # Call the CUDA kernel
+    # You would need to modify this part to fit your actual CUDA kernel invocation
+    cuda_func(np.int32(start),
+              np.int32(n_samples),
+              np.int32(n_dimensions),
+              np.int32(grid_size),
+              np.int32(grid_n),
+              pos_gpu,
+              negf_gpu,
+              result_indices_gpu,
+              result_starts_counts_gpu,
+              max_distances_gpu,
+              square_positions_gpu,
+              sumQ_gpu,
+              block=(block_size, 1, 1), grid=(num_blocks, 1))
+
+    end_time = time.time()
+
+    execution_time = end_time - start_time
+    #print("Run: ", execution_time, "seconds")
+
+    start_time = time.time()
+
+    # Transfer results back to CPU
+    cuda.memcpy_dtoh(neg_f, negf_gpu)
+    cuda.memcpy_dtoh(sumQ, sumQ_gpu)
+
+    end_time = time.time()
+
+    execution_time = end_time - start_time
+    #print("Copy back: ", execution_time, "seconds")
+    
+    end_time = time.time()
+    execution_time = end_time - total_start_time
+    #print("Total: ", execution_time, "seconds")
+
+    #print("negf: ", neg_f)  # Output: [5 7 9]
+    #print("sumQ: ", sumQ[0])
+    return neg_f, sumQ[0]
+
+
+
 def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples):
 
     total_start_time = time.time()
@@ -139,7 +253,7 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
     end_time = time.time()
 
     execution_time = end_time - start_time
-    print("Mem alloc: ", execution_time, "seconds")
+    #print("Mem alloc: ", execution_time, "seconds")
 
     start_time = time.time()
 
@@ -150,7 +264,7 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
     end_time = time.time()
 
     execution_time = end_time - start_time
-    print("Mem copy: ", execution_time, "seconds")
+    #print("Mem copy: ", execution_time, "seconds")
 
     block_size = 256
     num_blocks = (n_samples + block_size - 1) // block_size
@@ -166,7 +280,7 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
     end_time = time.time()
 
     execution_time = end_time - start_time
-    print("Run: ", execution_time, "seconds")
+    #print("Run: ", execution_time, "seconds")
 
     start_time = time.time()
 
@@ -177,12 +291,12 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
     end_time = time.time()
 
     execution_time = end_time - start_time
-    print("Copy back: ", execution_time, "seconds")
+    #print("Copy back: ", execution_time, "seconds")
     
     end_time = time.time()
     execution_time = end_time - total_start_time
-    print("Total: ", execution_time, "seconds")
+    #print("Total: ", execution_time, "seconds")
 
     #print("negf: ", neg_f)  # Output: [5 7 9]
-    print("sumQ: ", sumQ[0])
+    #print("sumQ: ", sumQ[0])
     return neg_f, sumQ[0]
