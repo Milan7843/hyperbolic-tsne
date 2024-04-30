@@ -173,6 +173,9 @@ extensions = [
     Extension("hyperbolicTSNE.hyperbolic_barnes_hut.tsne",
               sources=["hyperbolicTSNE/hyperbolic_barnes_hut/tsne.pyx"],
               language="c++"),
+    Extension("hyperbolicTSNE.hyperbolic_barnes_hut.uniform_grid",
+              sources=["hyperbolicTSNE/hyperbolic_barnes_hut/uniform_grid.pyx"],
+              language="c++"),
 ]
 
 
