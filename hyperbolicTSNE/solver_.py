@@ -234,6 +234,11 @@ def gradient_descent(
         tic_l = time()
     # End: logging
 
+    
+    log_iteration(logging_dict, logging_key, 0, y, n_samples, n_components,
+                    cf_val=0.0, grad=0.0, grad_norm=0.0,
+                    log_arrays=log_arrays, log_arrays_ids=log_arrays_ids)
+
     tic = time()
     i = start_it-1
     for i in (pbar := tqdm(range(i+1, total_its), "Gradient Descent")):

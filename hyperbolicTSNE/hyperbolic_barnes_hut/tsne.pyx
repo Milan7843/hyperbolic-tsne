@@ -34,7 +34,7 @@ cdef double MAX_TANH = 15.0
 cdef double BOUNDARY = 1 - EPSILON
 cdef int RANGE = 0
 cdef int ANGLE = 1
-cdef double MACHINE_EPSILON = np.finfo(np.double).eps
+cdef double MACHINE_EPSILON = 2.220446049250313e-16#np.finfo(np.double).eps
 cdef int TAKE_TIMING = 1
 cdef int AREA_SPLIT = 0
 cdef int GRAD_FIX = 1
@@ -991,10 +991,19 @@ cdef double exact_compute_gradient(float[:] timings,
     cdef double* neg_f = <double*> malloc(sizeof(double) * n_samples * n_dimensions)
     cdef double* pos_f = <double*> malloc(sizeof(double) * n_samples * n_dimensions)
 
+
     if TAKE_TIMING:
         t1 = clock()
+        
+    t1 = clock()
+
     sQ = exact_compute_gradient_negative(pos_reference, neighbors, indptr, neg_f, qt, dof, theta, start,
                                    stop, num_threads)
+
+    t2 = clock()
+
+    with gil:
+        print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1003,9 +1012,16 @@ cdef double exact_compute_gradient(float[:] timings,
     if TAKE_TIMING:
         t1 = clock()
 
+    t1 = clock()
+
     error = compute_gradient_positive(val_P, pos_reference, neighbors, indptr,
                                       pos_f, n_dimensions, dof, sQ, start,
                                       qt.verbose, compute_error, num_threads)
+
+    t2 = clock()
+
+    with gil:
+        print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1016,17 +1032,24 @@ cdef double exact_compute_gradient(float[:] timings,
             coord = i * n_dimensions + ax
             tot_force[i, ax] = pos_f[coord] - (neg_f[coord] / sQ)
 
-    with gil:
-        print("sQ: ", sQ)
-        for i in range(0, n_samples):
-            for ax in range(n_dimensions):
-                coord = i * n_dimensions + ax
-                print(neg_f[coord])
+    #with gil:
+    #    print("sQ: ", sQ)
+    #    for i in range(0, n_samples):
+    #        for ax in range(n_dimensions):
+    #            coord = i * n_dimensions + ax
+    #            print(neg_f[coord])
+    #with gil:
+    #    print("machine_epsilon: ", MACHINE_EPSILON)
+    #    print("sumQ: ", sQ)
+    #    print("neg_fs: ", MACHINE_EPSILON)
+    #    for i in range(0, n_samples):
+    #        for ax in range(n_dimensions):
+    #            coord = i * n_dimensions + ax
+    #            print(neg_f[coord])
 
     free(neg_f)
     free(pos_f)
     return error
-
 
 #######################################
 # Exact (GPU accelerated)
@@ -1067,7 +1090,7 @@ cdef double exact_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1086,7 +1109,7 @@ cdef double exact_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1102,8 +1125,11 @@ cdef double exact_compute_gradient_gpu(float[:] timings,
 
     t2 = clock()
 
-    #print("applying forces took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("applying forces took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    #with gil:
     #print("machine_epsilon: ", MACHINE_EPSILON)
+    #print("sumQ: ", sQ)
+    #print("neg_fs: ", MACHINE_EPSILON)
     #for i in range(0, n_samples):
     #    for ax in range(n_dimensions):
     #        coord = i * n_dimensions + ax
@@ -1148,7 +1174,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] neg_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1167,7 +1193,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] pos_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1183,7 +1209,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
 
     t2 = clock()
 
-    #print("applying forces took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] applying forces: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
     #print("machine_epsilon: ", MACHINE_EPSILON)
     #for i in range(0, n_samples):
     #    for ax in range(n_dimensions):
@@ -1516,6 +1542,7 @@ def gradient(float[:] timings,
                              qt, theta, dof, skip_num_points, -1, compute_error,
                              num_threads)
     else:
+        # uniform_grid_compute_gradient_gpu
         C = uniform_grid_compute_gradient_gpu(timings, val_P, pos_output, neighbors, indptr, forces,
                              qt, theta, dof, skip_num_points, -1, compute_error,
                              num_threads)

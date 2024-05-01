@@ -22,12 +22,13 @@ def py_divide_points_over_grid(points, n):
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
     cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(num_points, dtype=np.int32)
+    cdef np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point = np.empty(num_points, dtype=np.int32)
     cdef np.ndarray[np.int32_t, ndim=1] result_starts_counts = np.empty((grid_size * 2), dtype=np.int32)
     cdef np.ndarray[np.float64_t, ndim=1] max_distances = np.empty(grid_size, dtype=np.float64)
     cdef np.ndarray[np.float64_t, ndim=1] square_positions = np.zeros((grid_size * 2), dtype=np.float64)
     cdef double x_min, width, y_min, height
-    c_divide_points_over_grid(points, n, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
-    return result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
+    c_divide_points_over_grid(points, n, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
+    return grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
 
 def py_poincare_to_euclidean(x, y):
     cdef double ex, ey
@@ -49,14 +50,21 @@ def py_euclidean_to_poincare(x, y):
 #
 #
 
+cdef void poincare_to_klein(double px, double py, double* kx, double* ky):
+    cdef double denominator = 1.0 + px*px + py*py
+    kx[0] = 2.0 * px / denominator
+    ky[0] = 2.0 * py / denominator
+    return
 
-cdef double er_to_hr(double er):
-    return acosh(1 + 2 * er * er / (1 - er * er + MACHINE_EPSILON))
+cdef void klein_to_poincare(double kx, double ky, double* px, double* py):
+    cdef double denominator = 1.0 + np.sqrt(1.0 - kx*kx - ky*ky)
+    px[0] = kx / denominator
+    py[0] = ky / denominator
+    return
 
-cdef double hr_to_er(double hr):
-    cdef double ch = cosh(hr)
-
-    return sqrt((ch - 1) / (ch + 1))
+cdef double gamma(double v0, double v1):
+    cdef double norm_v_sq = v0 * v0 + v1 * v1
+    return 1.0 / np.sqrt(1.0 - norm_v_sq)
 
 cdef void poincare_to_euclidian(double x, double y, double* ox, double* oy):
     if (x == 0.0 and y == 0.0):
@@ -64,18 +72,10 @@ cdef void poincare_to_euclidian(double x, double y, double* ox, double* oy):
         oy[0] = 0.0
         return
 
-    
-
     cdef double r = np.sqrt(x*x + y*y)
     ox[0] = (1.0 * x) / (1.0 - r)
     oy[0] = (1.0 * y) / (1.0 - r)
     return
-
-
-    cdef double new_r = hr_to_er(r)
-
-    ox[0] = (2.0 * x / r) * new_r
-    oy[0] = (2.0 * y / r) * new_r
 
 cdef void euclidean_to_poincare(double x, double y, double* ox, double* oy):
     if (x == 0.0 and y == 0.0):
@@ -87,12 +87,6 @@ cdef void euclidean_to_poincare(double x, double y, double* ox, double* oy):
     ox[0] = (1.0 * x) / (1.0 + r)
     oy[0] = (1.0 * y) / (1.0 + r)
     return
-
-
-    cdef double new_r = er_to_hr(r)
-
-    ox[0] = (2.0 * x / r) * new_r
-    oy[0] = (2.0 * y / r) * new_r
 
 
 cpdef double distance(double u0, double u1, double v0, double v1):
@@ -152,6 +146,7 @@ cdef double max_distance_in_grid_square(int grid_x, int grid_y, double grid_widt
     return max_dist
 
 cdef void c_divide_points_over_grid(double[:,:] points, int n,
+        np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point,
         np.ndarray[np.int32_t, ndim=1] result_indices,
         np.ndarray[np.int32_t, ndim=1] result_starts_counts,
         np.ndarray[np.float64_t, ndim=1] max_distances,
@@ -176,7 +171,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
     # ======= STEP 1 =======
     
-    cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
+    #cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
     cdef double dist = 0.0
     cdef double ex, ey
 
@@ -205,7 +200,8 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
             index = grid_size-1
         
 
-        indices[p] = index # valid
+        grid_square_indices_per_point[p] = index # valid
+
 
         # TODO: calculate max distance in square from center
         #dist = max_distance_in_grid_square(i, j, grid_width_x, grid_width_y, x, y, x_min[0], width[0], y_min[0], height[0])
@@ -213,9 +209,9 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         #if (dist > max_distances[index]):
         #    max_distances[index] = dist
 
-        poincare_to_euclidian(x, y, &ex, &ey)
-        square_positions[index*2 + 0] += ex
-        square_positions[index*2 + 1] += ey
+        #poincare_to_euclidian(x, y, &ex, &ey)
+        #square_positions[index*2 + 0] += x
+        #square_positions[index*2 + 1] += y
 
 
     # ======= STEP 2 =======
@@ -228,7 +224,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
     # Counting the members
     for p in range(num_points):
-        index = indices[p]
+        index = grid_square_indices_per_point[p]
 
         grid_counts[index] += 1
 
@@ -250,7 +246,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
     # ======= STEP 4 =======
 
     for p in range(num_points):
-        index = indices[p] # valid
+        index = grid_square_indices_per_point[p] # valid
 
         # Moving the current pointer over
         result_index = grid_start_indices[index]
@@ -261,14 +257,41 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
     # ======= STEP 5 =======
 
+    cdef double mid_x = 0.0
+    cdef double mid_y = 0.0
+    cdef double point_klein_x = 0.0
+    cdef double point_klein_y = 0.0
+    cdef double point_poincare_x = 0.0
+    cdef double point_poincare_y = 0.0
+    cdef double gamma_sum = 0.0
+    cdef double g = 0.0
+
     # Calculating the average position of each square
     for i in range(grid_size):
         if (grid_counts[i] == 0):
             continue
-            
-        euclidean_to_poincare(square_positions[i*2 + 0] / grid_counts[i], square_positions[i*2 + 1] / grid_counts[i], &ex, &ey)
-        square_positions[i*2 + 0] = ex
-        square_positions[i*2 + 1] = ey
+
+        mid_x = 0.0
+        mid_y = 0.0
+        gamma_sum = 0.0
+        g = 0.0
+        
+        # Calculate the midpoint
+        for j in range(result_starts_counts[i*2+0], result_starts_counts[i*2+0] + result_starts_counts[i*2+1]):
+            index = result_indices[j]
+            poincare_to_klein(points[index, 0], points[index, 1], &point_klein_x, &point_klein_y)
+            g = gamma(point_klein_x, point_klein_y)
+            mid_x += g * point_klein_x
+            mid_y += g * point_klein_y
+            gamma_sum += g
+        
+        mid_x /= gamma_sum
+        mid_y /= gamma_sum
+
+        klein_to_poincare(mid_x, mid_y, &point_poincare_x, &point_poincare_y)
+        
+        square_positions[i*2 + 0] = point_poincare_x
+        square_positions[i*2 + 1] = point_poincare_y
     
     # ======= STEP 6 ========
     
@@ -296,7 +319,6 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
 
     # Free memory for temporary arrays
-    free(indices)
     free(grid_counts)
     free(grid_start_indices)
 

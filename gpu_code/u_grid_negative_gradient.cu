@@ -68,6 +68,7 @@ __global__ void add(int start,
                     int grid_n,
                     double *pos,
                     double *neg_f,
+                    int* grid_square_indices_per_point,
                     int* result_indices, 
                     int* result_starts_counts,
                     double* max_distances,
@@ -75,11 +76,19 @@ __global__ void add(int start,
                     double *sumQ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
+    /*
+    for (int k = 0; k < n_samples; k++) {
+        neg_f[k] = 1.0;
+    }
+    atomicAdd(sumQ, 1.0);
+
+    return;
+    */
     if (i > n_samples) {
         return;
     }
 
-    int i_grid_index = result_indices[i];
+    int i_grid_index = grid_square_indices_per_point[i];
     int grid_x = i_grid_index % grid_n;
     int grid_y = int(i_grid_index / grid_n);
 
@@ -92,10 +101,11 @@ __global__ void add(int start,
     double theta = 0.5;
     double theta_sq = theta*theta;
     int point_count = 0;
+    int range = 1;
 
     // Looping over all grid squares
-    for (int k = start; k < grid_size; k++) {
-
+    for (int k = 0; k < grid_size; k++) {
+        //for (int k = i_grid_index; k <= i_grid_index; k++) {
         point_count = result_starts_counts[k*2+1];
 
         // Check for empty square
@@ -111,7 +121,8 @@ __global__ void add(int start,
 
         // If the square error is relatively small, compute using only the square average
         //if ((max_square_dist*max_square_dist) / dist_to_square < theta_sq) {
-        if (abs(k_grid_x - grid_x) > 1 || abs(k_grid_y - grid_y) > 1) {
+        
+        if (true){//i_grid_index != k) {//true || (abs(k_grid_x - grid_x) > range || abs(k_grid_y - grid_y) > range)) {
             dij = distance(pos[i*2 + 0], pos[i*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1]);
             dij_sq = dij * dij;
 
