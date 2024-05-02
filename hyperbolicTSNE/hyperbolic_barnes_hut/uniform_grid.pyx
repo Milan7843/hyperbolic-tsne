@@ -22,13 +22,14 @@ def py_divide_points_over_grid(points, n):
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
     cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(num_points, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=2] new_points = np.empty(points.shape, dtype=np.float64)
     cdef np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point = np.empty(num_points, dtype=np.int32)
     cdef np.ndarray[np.int32_t, ndim=1] result_starts_counts = np.empty((grid_size * 2), dtype=np.int32)
     cdef np.ndarray[np.float64_t, ndim=1] max_distances = np.empty(grid_size, dtype=np.float64)
     cdef np.ndarray[np.float64_t, ndim=1] square_positions = np.zeros((grid_size * 2), dtype=np.float64)
     cdef double x_min, width, y_min, height
-    c_divide_points_over_grid(points, n, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
-    return grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
+    c_divide_points_over_grid(points, new_points, n, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
+    return new_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
 
 def py_poincare_to_euclidean(x, y):
     cdef double ex, ey
@@ -145,7 +146,30 @@ cdef double max_distance_in_grid_square(int grid_x, int grid_y, double grid_widt
 
     return max_dist
 
-cdef void c_divide_points_over_grid(double[:,:] points, int n,
+
+def reverse_reorder_array_inplace_py(original_array, result_indices):
+    reverse_reorder_array_inplace(original_array, result_indices)
+    #return
+
+cdef void reverse_reorder_array_inplace(np.ndarray[np.float64_t, ndim=1] original_array, np.ndarray[np.int32_t, ndim=1] result_indices):
+    cdef int num_elements = result_indices.shape[0]
+    cdef np.ndarray[np.float64_t, ndim=1] temp_array = np.empty_like(original_array)
+
+    cdef int i
+
+    # Copy original array to temporary array
+    for i in range(num_elements):
+        temp_array[i*2+0] = original_array[i*2+0]
+        temp_array[i*2+1] = original_array[i*2+1]
+
+    # Reorder the original array according to result_indices
+    for i in range(num_elements):
+        original_array[result_indices[i]*2+0] = temp_array[i*2+0]
+        original_array[result_indices[i]*2+1] = temp_array[i*2+1]
+
+
+
+cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t, ndim=2] new_points, int n,
         np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point,
         np.ndarray[np.int32_t, ndim=1] result_indices,
         np.ndarray[np.int32_t, ndim=1] result_starts_counts,
@@ -160,7 +184,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
     cdef double x, y
     
     # Steps of this algorithm:
-    # 1. decide for each point which grid square index it belongs to (saved into indices)
+    # 1. decide for each point which grid square index it belongs to (saved into grid_square_indices_per_point)
     # 2. find for each grid square how many members it has (grid_counts)
     # 3. using the member count to find the start index int he final array for each grid square
     # 4. using these values as the start values, fill the final result indices array
@@ -246,11 +270,13 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
     # ======= STEP 4 =======
 
     for p in range(num_points):
+        # Finding the grid square this point belongs to
         index = grid_square_indices_per_point[p] # valid
 
-        # Moving the current pointer over
+        # Then finding the pointer into the result_indices array (holds the indices per grid square)
         result_index = grid_start_indices[index]
 
+        # Moving the current pointer over
         result_indices[result_index] = p
         grid_start_indices[index] += 1
 
@@ -293,6 +319,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         square_positions[i*2 + 0] = point_poincare_x
         square_positions[i*2 + 1] = point_poincare_y
     
+    
     # ======= STEP 6 ========
     
     for p in range(num_points):
@@ -317,6 +344,16 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         if (dist > max_distances[index]):
             max_distances[index] = dist
 
+
+    # ======= STEP 7 =======
+
+    # Reorder the points array according to the indices in the result_indices array
+    for i in range(num_points):
+        new_points[i] = points[result_indices[i]]
+
+    #for i in range(num_points):
+    #    points[i, 0] = new_points[i, 0]
+    #    points[i, 1] = new_points[i, 1]
 
     # Free memory for temporary arrays
     free(grid_counts)
