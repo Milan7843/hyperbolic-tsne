@@ -61,74 +61,75 @@ __device__ double distance_grad(double u0, double u1, double v0, double v1, int 
     return shared_scalar * (u_scalar * u1 - v_scalar * v1);
 }
 
-__global__ void add(int start, int n_samples, int n_dimensions, double sum_Q, double *pos, double *pos_f, double *C_values, long *neighbors, long *indptr, double *val_P) {
+__global__ void add(int start,
+                    int n_samples,
+                    int n_dimensions,
+                    int grid_size,
+                    int grid_n,
+                    double *pos,
+                    double *neg_f,
+                    int* grid_square_indices_per_point,
+                    int* result_indices, 
+                    int* result_starts_counts,
+                    double* max_distances,
+                    double* square_positions,
+                    double *sumQ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
+    /*
+    for (int k = 0; k < n_samples; k++) {
+        neg_f[k] = 1.0;
+    }
+    atomicAdd(sumQ, 1.0);
+
+    return;
+    */
     if (i > n_samples) {
         return;
     }
 
-    double FLOAT32_TINY = 1.1754944e-38;
+    int point_index = i;
+
+    int i_grid_index = grid_square_indices_per_point[point_index];
+    int grid_x = i_grid_index % grid_n;
+    int grid_y = int(i_grid_index / grid_n);
 
     double qij = 0.0;
     double dij = 0.0;
     double dij_sq = 0.0;
-    for (int ax = 0; ax < n_dimensions; ax++) {
-        pos_f[i * n_dimensions + ax] += 1.0;
-    }
-    /*
-    for (long k = indptr[i]; k < indptr[i+1]; k++) {
-        long j = neighbors[k];
-        double pij = val_P[k];
+    double thread_sQ = 0.0;
+    double max_square_dist = 0.0;
+    double dist_to_square = 0.0;
+    double theta = 0.5;
+    double theta_sq = theta*theta;
+    int point_count = 0;
+    int range = 1;
 
-        dij = distance(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1]);
+    // Check all points in own square
+    for (int m = result_starts_counts[i_grid_index*2+0]; m < result_starts_counts[i_grid_index*2+0] + result_starts_counts[i_grid_index*2+1]; m++) {
+        //int j = result_indices[m];
+        int j = m;
+        if (j == point_index) {
+            continue;
+        }
+        
+        dij = distance(pos[point_index*2 + 0], pos[point_index*2 + 1], pos[j*2 + 0], pos[j*2 + 1]);
         dij_sq = dij * dij;
 
         qij = 1.0 / (1.0 + dij_sq);
 
         double mult = qij * qij;
 
-
-        if (true) {
-            qij = qij / sum_Q;
-            C_values[i] += pij * log(max(pij, FLOAT32_TINY) / max(qij, FLOAT32_TINY));
-        }
-
+        thread_sQ += qij;
         for (int ax = 0; ax < n_dimensions; ax++) {
-            pos_f[i * n_dimensions + ax] += mult * distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
+            neg_f[point_index * n_dimensions + ax] += mult * distance_grad(pos[point_index*2 + 0], pos[point_index*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
             //neg_f[i * n_dimensions + ax] = distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
             //neg_f[i * n_dimensions + ax] = mult;
             //neg_f[i * n_dimensions + ax] = distance(0.1, -0.1, 0.3, 0.5);
             //neg_f[i * n_dimensions + ax] = distance_grad(0.1, -0.1, 0.3, 0.5, 0);
         }
-    }*/
+    }
+    
 
-
-    /*
-    for i in range(start, n_samples):
-
-        # Compute the positive interaction for the nearest neighbors
-        for k in range(indptr[i], indptr[i+1]):
-            j = neighbors[k]
-            pij = val_P[k]
-
-            dij = distance(pos_reference[i, 0], pos_reference[i, 1], pos_reference[j, 0], pos_reference[j, 1])
-            dij_sq = dij * dij
-
-            qij = 1. / (1. + dij_sq)
-
-            if GRAD_FIX:
-                # New Fix
-                mult = pij * qij * dij
-            else:
-                # Old solution
-                mult = pij * qij
-
-            # only compute the error when needed
-            if compute_error:
-                qij = qij / sum_Q
-                C += pij * log(max(pij, FLOAT32_TINY) / max(qij, FLOAT32_TINY))
-            for ax in range(n_dimensions):
-                pos_f[i * n_dimensions + ax] += mult * distance_grad(pos_reference[i, 0], pos_reference[i, 1], pos_reference[j, 0], pos_reference[j, 1], ax)
-                    */
+    atomicAdd(sumQ, thread_sQ);
 }

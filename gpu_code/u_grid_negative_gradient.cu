@@ -156,8 +156,8 @@ __global__ void add(int start,
             continue;
         }
 
-        int k_grid_x = k % grid_n;
-        int k_grid_y = int(k / grid_n);
+        //int k_grid_x = k % grid_n;
+        //int k_grid_y = int(k / grid_n);
 
         //max_square_dist = max_distances[k];
         //dist_to_square = distance(pos[i*2 + 0], pos[i*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1]);
@@ -165,26 +165,26 @@ __global__ void add(int start,
         // If the square error is relatively small, compute using only the square average
         //if ((max_square_dist*max_square_dist) / dist_to_square < theta_sq) {
         
-        //if (true){//(abs(k_grid_x - grid_x) > range || abs(k_grid_y - grid_y) > range)) {
-        dij = distance(pos[point_index*2 + 0], pos[point_index*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1]);
-        dij_sq = dij * dij;
+        if (true){//k != i_grid_index){//true){//(abs(k_grid_x - grid_x) > range || abs(k_grid_y - grid_y) > range)) {
+            dij = distance(pos[point_index*2 + 0], pos[point_index*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1]);
+            dij_sq = dij * dij;
 
-        qij = 1.0 / (1.0 + dij_sq);
+            qij = 1.0 / (1.0 + dij_sq);
 
-        double mult = qij * qij;
+            double mult = qij * qij;
 
-        thread_sQ += qij * point_count;
-        for (int ax = 0; ax < n_dimensions; ax++) {
-            neg_f[i * n_dimensions + ax] += point_count * mult * distance_grad(pos[point_index*2 + 0], pos[point_index*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1], ax);
-            //neg_f[i * n_dimensions + ax] = distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
-            //neg_f[i * n_dimensions + ax] = mult;
-            //neg_f[i * n_dimensions + ax] = distance(0.1, -0.1, 0.3, 0.5);
-            //neg_f[i * n_dimensions + ax] = distance_grad(0.1, -0.1, 0.3, 0.5, 0);
-        }
+            thread_sQ += qij * point_count;
+            for (int ax = 0; ax < n_dimensions; ax++) {
+                neg_f[i * n_dimensions + ax] += point_count * mult * distance_grad(pos[point_index*2 + 0], pos[point_index*2 + 1], square_positions[k*2 + 0], square_positions[k*2 + 1], ax);
+                //neg_f[i * n_dimensions + ax] = distance_grad(pos[i*2 + 0], pos[i*2 + 1], pos[j*2 + 0], pos[j*2 + 1], ax);
+                //neg_f[i * n_dimensions + ax] = mult;
+                //neg_f[i * n_dimensions + ax] = distance(0.1, -0.1, 0.3, 0.5);
+                //neg_f[i * n_dimensions + ax] = distance_grad(0.1, -0.1, 0.3, 0.5, 0);
+            }
             
             // Move on to next grid square
             //continue;
-        //}
+        }
 
         /*
         // Otherwise check all points in the square
