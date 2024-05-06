@@ -176,8 +176,6 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     global square_positions_gpu
     global grid_square_indices_per_point_gpu
 
-    take_timing = False
-
     total_start_time = time.time()
 
     # Allocate memory for neg_f and sumQs
@@ -191,12 +189,11 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     reordered_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
 
     #print(pos_reference)
-    if (take_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[UG] Grid generation: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[UG] Grid generation: ", execution_time, "seconds")
 
-        start_time = time.time()
+    start_time = time.time()
 
     if (pos_gpu == None):
         #pos_gpu = cuda.mem_alloc(reordered_points.nbytes)
@@ -209,13 +206,12 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
         square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
         grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
 
-    if (take_timing):
-        end_time = time.time()
+    end_time = time.time()
 
-        execution_time = end_time - start_time
-        print("[UG] Mem alloc: ", execution_time, "seconds")
+    execution_time = end_time - start_time
+    #print("[UG] Mem alloc: ", execution_time, "seconds")
 
-        start_time = time.time()
+    start_time = time.time()
 
     #cuda.memcpy_htod(pos_gpu, reordered_points)
     cuda.memcpy_htod(pos_gpu, pos_reference)
@@ -229,11 +225,10 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     cuda.memcpy_htod(square_positions_gpu, square_positions) # g * 8 bytes
     cuda.memcpy_htod(grid_square_indices_per_point_gpu, grid_square_indices_per_point) # g * 2 * 8 bytes
 
-    if (take_timing):
-        end_time = time.time()
+    end_time = time.time()
 
-        execution_time = end_time - start_time
-        print("[UG] Mem copy: ", execution_time, "seconds")
+    execution_time = end_time - start_time
+    #print("[UG] Mem copy: ", execution_time, "seconds")
 
     block_size = 512
     num_blocks = (n_samples + block_size - 1) // block_size
@@ -275,31 +270,28 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     #                sumQ_gpu,
     #                block=(block_size, 1, 1), grid=(num_blocks, 1))
 
-    if (take_timing):
-        end_time = time.time()
+    end_time = time.time()
 
-        execution_time = end_time - start_time
-        print("[UG] Run: ", execution_time, "seconds")
+    execution_time = end_time - start_time
+    #print("[UG] Run: ", execution_time, "seconds")
 
-        start_time = time.time()
+    start_time = time.time()
 
     # Transfer results back to CPU
     cuda.memcpy_dtoh(neg_f, negf_gpu)
     cuda.memcpy_dtoh(sumQ, sumQ_gpu)
 
-    if (take_timing):
-        end_time = time.time()
+    end_time = time.time()
 
-        execution_time = end_time - start_time
-        print("[UG] Copy back: ", execution_time, "seconds")
+    execution_time = end_time - start_time
+    #print("[UG] Copy back: ", execution_time, "seconds")
 
     # Reversing the reordering of the points
     #uniform_grid.reverse_reorder_array_inplace_py(neg_f, result_indices)
     
-    if (take_timing):
-        end_time = time.time()
-        execution_time = end_time - total_start_time
-        print("[UG] Total: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - total_start_time
+    #print("[UG] Total: ", execution_time, "seconds")
 
     #print("negf: ", neg_f)  # Output: [5 7 9]
     #print("sumQ: ", sumQ[0])

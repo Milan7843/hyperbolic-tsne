@@ -188,10 +188,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     cdef int i, j, k, index
     cdef double x, y
 
-    cdef print_timing = 0
-
-    if (print_timing == 1):
-        print("[GRID] start")
+    #print("[GRID] start")
     
     start_time = get_current_time()
 
@@ -220,13 +217,12 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     grid_width_x = width[0] / n
     grid_width_y = height[0] / n
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Init: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Init: ", execution_time, "ms")
 
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     for p in range(num_points):
         x = points[p, 0] # valid
@@ -258,16 +254,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         #square_positions[index*2 + 1] += y
 
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Indices: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Indices: ", execution_time, "ms")
 
     # ======= STEP 2 =======
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     cdef int* grid_counts = <int*>malloc(sizeof(int) * grid_size)
 
@@ -282,16 +276,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         grid_counts[index] += 1
 
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Counts: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Counts: ", execution_time, "ms")
 
     # ======= STEP 3 =======
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     cdef int* grid_start_indices = <int*>malloc(sizeof(int) * grid_size)
     cdef int current_start_index = 0
@@ -304,16 +296,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         grid_start_indices[i] = current_start_index
         current_start_index += grid_counts[i]
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Starts, counts: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Starts, counts: ", execution_time, "ms")
 
     # ======= STEP 4 =======
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     for p in range(num_points):
         # Finding the grid square this point belongs to
@@ -327,16 +317,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         grid_start_indices[index] += 1
 
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Starts, counts: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Starts, counts: ", execution_time, "ms")
 
     # ======= STEP 5 =======
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     #cdef double point_klein_x = 0.0
     #cdef double point_klein_y = 0.0
@@ -359,13 +347,12 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
 
     mids, gs = calculate_average_grid_square_positions_gpu(points, num_points, n, grid_square_indices_per_point)
 
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Average positions p1: ", execution_time, "ms")
-        
-        start_time = get_current_time()
+    execution_time = end_time - start_time
+    #print("[GRID] Average positions p1: ", execution_time, "ms")
+    
+    start_time = get_current_time()
 
     # Calculating the average position of each square
     for i in range(grid_size):
@@ -377,16 +364,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         square_positions[i*2 + 0] = point_poincare_x
         square_positions[i*2 + 1] = point_poincare_y
     
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Average positions p2: ", execution_time, "ms")
-    
+    execution_time = end_time - start_time
+    #print("[GRID] Average positions p2: ", execution_time, "ms")
+
     # ======= STEP 6 ========
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
     
     for p in range(num_points):
         x = points[p, 0] # valid
@@ -410,27 +395,24 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
         if (dist > max_distances[index]):
             max_distances[index] = dist
     
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] Max distances: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] Max distances: ", execution_time, "ms")
 
 
     # ======= STEP 7 =======
 
-    if (print_timing == 1):
-        start_time = get_current_time()
+    start_time = get_current_time()
 
     # Reorder the points array according to the indices in the result_indices array
     #for i in range(num_points):
     #    new_points[i] = points[result_indices[i]]
     
-    if (print_timing == 1):
-        end_time = get_current_time()
+    end_time = get_current_time()
 
-        execution_time = end_time - start_time
-        print("[GRID] new points: ", execution_time, "ms")
+    execution_time = end_time - start_time
+    #print("[GRID] new points: ", execution_time, "ms")
 
     #for i in range(num_points):
     #    points[i, 0] = new_points[i, 0]

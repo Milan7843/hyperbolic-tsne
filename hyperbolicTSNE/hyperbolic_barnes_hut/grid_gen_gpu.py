@@ -32,25 +32,20 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
     global gs_gpu
     global grid_square_indices_per_point_gpu
 
-    print_timing = False
-
-    if (print_timing):
-        total_start_time = time.time()
+    total_start_time = time.time()
 
     grid_size = grid_n*grid_n
 
-    if (print_timing):
-        start_time = time.time()
+    start_time = time.time()
 
     mids = np.zeros(grid_size*2, dtype=np.double)
     gs = np.zeros(grid_size, dtype=np.double)
 
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] Create mids, gs: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] Create mids, gs: ", execution_time, "seconds")
 
-        start_time = time.time()
+    start_time = time.time()
 
     if (pos_gpu == None):
         pos_gpu = cuda.mem_alloc(points.nbytes)
@@ -58,12 +53,11 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
         gs_gpu = cuda.mem_alloc(gs.nbytes)
         grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
     
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] Memory allocation: ", execution_time, "seconds (", points.nbytes + mids.nbytes + gs.nbytes + grid_square_indices_per_point.nbytes," bytes)")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] Memory allocation: ", execution_time, "seconds (", points.nbytes + mids.nbytes + gs.nbytes + grid_square_indices_per_point.nbytes," bytes)")
 
-        start_time = time.time()
+    start_time = time.time()
 
     #cuda.memcpy_htod(pos_gpu, reordered_points)
     cuda.memcpy_htod(pos_gpu, points)
@@ -71,51 +65,46 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
     cuda.memcpy_htod(gs_gpu, gs)
     cuda.memcpy_htod(grid_square_indices_per_point_gpu, grid_square_indices_per_point)
     
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] Memory copy: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] Memory copy: ", execution_time, "seconds")
 
 
     block_size = 256
     num_blocks = (n_samples + block_size - 1) // block_size
 
-    if (print_timing):
-        start_time = time.time()
+    start_time = time.time()
 
     cuda_func = get_calculate_average_grid_square_positions_gpu_func()
 
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] Get function: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] Get function: ", execution_time, "seconds")
 
 
-        start_time = time.time()
+    start_time = time.time()
 
     # Call the CUDA kernel
     cuda_func(np.int32(n_samples), grid_square_indices_per_point_gpu, pos_gpu, mids_gpu, gs_gpu,
               block=(block_size, 1, 1), grid=(num_blocks, 1))
 
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] CUDA run: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] CUDA run: ", execution_time, "seconds")
 
-        start_time = time.time()
+    start_time = time.time()
 
     # Transfer results back to CPU
     cuda.memcpy_dtoh(mids, mids_gpu)
     cuda.memcpy_dtoh(gs, gs_gpu)
 
-    if (print_timing):
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("[Grid AVG] Retrieve results: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print("[Grid AVG] Retrieve results: ", execution_time, "seconds")
 
-        end_time = time.time()
-        execution_time = end_time - total_start_time
-        print("[Grid AVG] Total: ", execution_time, "seconds")
+    end_time = time.time()
+    execution_time = end_time - total_start_time
+    #print("[Grid AVG] Total: ", execution_time, "seconds")
 
     #print("negf: ", neg_f)  # Output: [5 7 9]
     #print("sumQ: ", sumQ[0])
