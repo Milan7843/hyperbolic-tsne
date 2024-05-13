@@ -1174,7 +1174,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("[UG] neg_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] neg_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1193,7 +1193,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("[UG] pos_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] pos_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1209,7 +1209,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
 
     t2 = clock()
 
-    #print("[UG] applying forces: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    print("[UG] applying forces: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
     #print("machine_epsilon: ", MACHINE_EPSILON)
     #for i in range(0, n_samples):
     #    for ax in range(n_dimensions):

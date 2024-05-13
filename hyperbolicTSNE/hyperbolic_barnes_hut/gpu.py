@@ -98,6 +98,12 @@ def compute_gradient_positive_gpu(start, pos_reference, n_dimensions, n_samples,
     neighbours_gpu = cuda.mem_alloc(neighbours.nbytes)
     indptr_gpu = cuda.mem_alloc(indptr.nbytes)
     val_P_gpu = cuda.mem_alloc(val_P.nbytes)
+    print("[PS] pos_reference.nbytes =", pos_reference.nbytes)
+    print("[PS] pos_f.nbytes =", pos_f.nbytes)
+    print("[PS] C_values.nbytes =", C_values.nbytes)
+    print("[PS] neighbours.nbytes =", neighbours.nbytes)
+    print("[PS] indptr.nbytes =", indptr.nbytes)
+    print("[PS] val_P.nbytes =", val_P.nbytes)
 
     end_time = time.time()
 
@@ -247,10 +253,10 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
               np.int32(grid_n),
               pos_gpu,
               negf_gpu,
-              grid_square_indices_per_point_gpu,
-              result_indices_gpu,
+              #grid_square_indices_per_point_gpu,
+              #result_indices_gpu,
               result_starts_counts_gpu,
-              max_distances_gpu,
+              #max_distances_gpu,
               square_positions_gpu,
               sumQ_gpu,
               block=(block_size, 1, 1), grid=(num_blocks, 1))

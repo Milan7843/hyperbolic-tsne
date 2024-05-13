@@ -68,10 +68,10 @@ __global__ void add(int start,
                     int grid_n,
                     double *pos,
                     double *neg_f,
-                    int* grid_square_indices_per_point,
-                    int* result_indices, 
+                    //int* grid_square_indices_per_point,
+                    //int* result_indices, 
                     int* result_starts_counts,
-                    double* max_distances,
+                    //double* max_distances,
                     double* square_positions,
                     double *sumQ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -90,20 +90,20 @@ __global__ void add(int start,
 
     int point_index = i;
 
-    int i_grid_index = grid_square_indices_per_point[point_index];
-    int grid_x = i_grid_index % grid_n;
-    int grid_y = int(i_grid_index / grid_n);
+    //int i_grid_index = grid_square_indices_per_point[point_index];
+    //int grid_x = i_grid_index % grid_n;
+    //int grid_y = int(i_grid_index / grid_n);
 
     double qij = 0.0;
     double dij = 0.0;
     double dij_sq = 0.0;
     double thread_sQ = 0.0;
-    double max_square_dist = 0.0;
-    double dist_to_square = 0.0;
-    double theta = 0.5;
-    double theta_sq = theta*theta;
+    //double max_square_dist = 0.0;
+    //double dist_to_square = 0.0;
+    //double theta = 0.5;
+    //double theta_sq = theta*theta;
     int point_count = 0;
-    int range = 1;
+    //int range = 1;
     /*
     // Calcuating in range exactly
     for (int dx = -range; dx <= range; dx++) {
