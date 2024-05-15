@@ -9,6 +9,8 @@ pos_gpu = None
 mids_gpu = None
 gs_gpu = None
 grid_square_indices_per_point_gpu = None
+saved_num_points = None
+saved_grid_n = None
 
 def get_calculate_average_grid_square_positions_gpu_func():
     global calculate_average_grid_square_positions_gpu_func
@@ -31,6 +33,8 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
     global mids_gpu
     global gs_gpu
     global grid_square_indices_per_point_gpu
+    global saved_num_points
+    global saved_grid_n
 
     total_start_time = time.time()
 
@@ -47,11 +51,13 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
 
     start_time = time.time()
 
-    if (pos_gpu == None):
+    if (saved_num_points == None or saved_num_points != n_samples or saved_grid_n != grid_n):
         pos_gpu = cuda.mem_alloc(points.nbytes)
         mids_gpu = cuda.mem_alloc(mids.nbytes)
         gs_gpu = cuda.mem_alloc(gs.nbytes)
         grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
+        saved_num_points = n_samples
+        saved_grid_n = grid_n
     
     end_time = time.time()
     execution_time = end_time - start_time

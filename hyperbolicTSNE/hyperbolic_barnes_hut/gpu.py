@@ -17,6 +17,8 @@ result_starts_counts_gpu =None
 max_distances_gpu = None
 square_positions_gpu = None
 grid_square_indices_per_point_gpu = None
+saved_num_points = None
+saved_ugrid_n = None
 
 def get_exact_compute_gradient_negative_gpu_func():
     global exact_compute_gradient_negative_gpu_func
@@ -172,7 +174,7 @@ def compute_gradient_positive_gpu(start, pos_reference, n_dimensions, n_samples,
     return pos_f, error
 
 
-def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples):
+def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples, grid_n):
     global pos_gpu
     global negf_gpu
     global sumQ_gpu
@@ -181,6 +183,8 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     global max_distances_gpu
     global square_positions_gpu
     global grid_square_indices_per_point_gpu
+    global saved_num_points
+    global saved_ugrid_n
 
     total_start_time = time.time()
 
@@ -189,7 +193,6 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     sumQ = np.zeros(1, dtype=np.double)
 
     start_time = time.time()
-    grid_n = 40
     grid_size = grid_n*grid_n
     #print(pos_reference)
     reordered_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
@@ -201,7 +204,7 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
 
     start_time = time.time()
 
-    if (pos_gpu == None):
+    if (saved_num_points == None or saved_num_points != n_samples or saved_ugrid_n != grid_n):
         #pos_gpu = cuda.mem_alloc(reordered_points.nbytes)
         pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
         negf_gpu = cuda.mem_alloc(neg_f.nbytes)
@@ -211,6 +214,8 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
         max_distances_gpu = cuda.mem_alloc(max_distances.nbytes)
         square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
         grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
+        saved_num_points = n_samples
+        saved_ugrid_n = grid_n
 
     end_time = time.time()
 

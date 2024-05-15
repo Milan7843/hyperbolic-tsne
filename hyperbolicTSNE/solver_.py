@@ -176,7 +176,7 @@ def gradient_descent(
     i : int
         Last iteration.
     """
-    print("Running Gradient Descent, Verbosity: " + str(verbose))
+    #print("Running Gradient Descent, Verbosity: " + str(verbose))
 
     n_samples, n_components = y0.shape
     y = y0.copy().ravel()
@@ -271,7 +271,7 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Calculate gradient: ", execution_time, "seconds")
+        #print("Calculate gradient: ", execution_time, "seconds")
 
         start_time = time()
         # Perform the actual gradient descent step
@@ -334,7 +334,7 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Gradient application: ", execution_time, "seconds")
+        #print("Gradient application: ", execution_time, "seconds")
 
         start_time = time()
 
@@ -349,7 +349,7 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Rescale: ", execution_time, "seconds")
+        #print("Rescale: ", execution_time, "seconds")
 
         start_time = time()
 
@@ -372,7 +372,7 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Logging: ", execution_time, "seconds")
+        #print("Logging: ", execution_time, "seconds")
 
         start_time = time()
 
@@ -469,7 +469,7 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Threshold check: ", execution_time, "seconds")
+        #print("Threshold check: ", execution_time, "seconds")
 
         start_time = time()
 
@@ -520,12 +520,12 @@ def gradient_descent(
         end_time = time()
 
         execution_time = end_time - start_time
-        print("Convergence check: ", execution_time, "seconds")
+        #print("Convergence check: ", execution_time, "seconds")
 
         end_time = time()
 
         execution_time = end_time - total_start_time
-        print("Gradient descent iteration: ", execution_time, "seconds")
+        #print("Gradient descent iteration: ", execution_time, "seconds")
 
     # FIXME Is this logging necessary as log iteration is called above already for all iterations?!
     # if logging:

@@ -86,7 +86,7 @@ __global__ void add(int start, int n_samples, int n_dimensions, double sum_Q, do
 
         qij = 1.0 / (1.0 + dij_sq);
 
-        double mult = qij * qij;
+        double mult = pij * qij;
 
 
         if (true) {
