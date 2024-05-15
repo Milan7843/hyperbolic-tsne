@@ -176,7 +176,7 @@ def gradient_descent(
     i : int
         Last iteration.
     """
-    print("Running Gradient Descent, Verbosity: " + str(verbose))
+    #print("Running Gradient Descent, Verbosity: " + str(verbose))
 
     n_samples, n_components = y0.shape
     y = y0.copy().ravel()
@@ -207,6 +207,7 @@ def gradient_descent(
     log_arrays = None
     log_arrays_ids = None
     tic_l = None
+    #print("logging_dict =", logging_dict)
     if logging_dict is not None:
         if logging_key is None:
             logging_key = ""
@@ -234,6 +235,11 @@ def gradient_descent(
         tic_l = time()
     # End: logging
 
+
+
+    # ======== GRADIENT DESCENT MAIN LOOP ========
+
+
     tic = time()
     i = start_it-1
     for i in (pbar := tqdm(range(i+1, total_its), "Gradient Descent")):
@@ -242,6 +248,8 @@ def gradient_descent(
         # only compute the error when needed
         compute_error = check_convergence or check_threshold or i == n_iter - 1
 
+        total_start_time = time()
+        start_time = time()
         
         if compute_error or logging:  # TODO: add different levels of logging to avoid bottlenecks
             error, grad = cf.obj_grad(y, **cf_params)
@@ -260,6 +268,12 @@ def gradient_descent(
             grad = cf.grad(y, **cf_params)
             grad_norm = linalg.norm(grad)
 
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Calculate gradient: ", execution_time, "seconds")
+
+        start_time = time()
         # Perform the actual gradient descent step
         if isinstance(cf, HyperbolicKL):
             if vanilla:
@@ -317,6 +331,13 @@ def gradient_descent(
             update = momentum * update - learning_rate * grad
             y += update * gradient_mask
 
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Gradient application: ", execution_time, "seconds")
+
+        start_time = time()
+
         pbar.set_description(
             f"Gradient Descent error: {error:.5f} grad_norm: {grad_norm:.5e}")
 
@@ -324,6 +345,13 @@ def gradient_descent(
         if rescale is not None and i % n_iter_rescale == 0:
             y = (y * gradient_mask_inverse) + ((y * gradient_mask) / (np.sqrt((np.max(
                 y[0::2]) - np.min(y[0::2])) ** 2 + (np.max(y[1::2]) - np.min(y[1::2])) ** 2) / rescale))
+
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Rescale: ", execution_time, "seconds")
+
+        start_time = time()
 
         # Start:logging
         if logging:
@@ -340,6 +368,13 @@ def gradient_descent(
                           log_arrays=log_arrays, log_arrays_ids=log_arrays_ids)
             tic_l = toc_l
         # End:logging
+
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Logging: ", execution_time, "seconds")
+
+        start_time = time()
 
         # See whether the solver should stop because the given error threshold has been reached
         if check_threshold:
@@ -431,6 +466,13 @@ def gradient_descent(
             if (threshold_check_size <= 0. or threshold_check_size_found) and (threshold_its <= 0 or threshold_its_found) and (threshold_cf <= 0. or threshold_cf_found):
                 return y.reshape(n_samples, n_components), error, i - start_it
 
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Threshold check: ", execution_time, "seconds")
+
+        start_time = time()
+
         if check_convergence:
             toc = time()
             duration = toc - tic
@@ -474,6 +516,17 @@ def gradient_descent(
                           (i + 1, emb_point_dists))
                 print("4")
                 break
+
+        end_time = time()
+
+        execution_time = end_time - start_time
+        #print("Convergence check: ", execution_time, "seconds")
+
+        end_time = time()
+
+        execution_time = end_time - total_start_time
+        #print("Gradient descent iteration: ", execution_time, "seconds")
+
     # FIXME Is this logging necessary as log iteration is called above already for all iterations?!
     # if logging:
     #     log_iteration(logging_dict, logging_key, i, y, n_samples, n_components,

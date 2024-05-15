@@ -34,7 +34,7 @@ cdef double MAX_TANH = 15.0
 cdef double BOUNDARY = 1 - EPSILON
 cdef int RANGE = 0
 cdef int ANGLE = 1
-cdef double MACHINE_EPSILON = np.finfo(np.double).eps
+cdef double MACHINE_EPSILON = 2.220446049250313e-16#np.finfo(np.double).eps
 cdef int TAKE_TIMING = 1
 cdef int AREA_SPLIT = 0
 cdef int GRAD_FIX = 1
@@ -991,10 +991,19 @@ cdef double exact_compute_gradient(float[:] timings,
     cdef double* neg_f = <double*> malloc(sizeof(double) * n_samples * n_dimensions)
     cdef double* pos_f = <double*> malloc(sizeof(double) * n_samples * n_dimensions)
 
+
     if TAKE_TIMING:
         t1 = clock()
+        
+    t1 = clock()
+
     sQ = exact_compute_gradient_negative(pos_reference, neighbors, indptr, neg_f, qt, dof, theta, start,
                                    stop, num_threads)
+
+    t2 = clock()
+
+    #with gil:
+        #print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1003,9 +1012,16 @@ cdef double exact_compute_gradient(float[:] timings,
     if TAKE_TIMING:
         t1 = clock()
 
+    t1 = clock()
+
     error = compute_gradient_positive(val_P, pos_reference, neighbors, indptr,
                                       pos_f, n_dimensions, dof, sQ, start,
                                       qt.verbose, compute_error, num_threads)
+
+    t2 = clock()
+
+    #with gil:
+        #print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1016,17 +1032,24 @@ cdef double exact_compute_gradient(float[:] timings,
             coord = i * n_dimensions + ax
             tot_force[i, ax] = pos_f[coord] - (neg_f[coord] / sQ)
 
-    with gil:
-        print("sQ: ", sQ)
-        for i in range(0, n_samples):
-            for ax in range(n_dimensions):
-                coord = i * n_dimensions + ax
-                print(neg_f[coord])
+    #with gil:
+    #    print("sQ: ", sQ)
+    #    for i in range(0, n_samples):
+    #        for ax in range(n_dimensions):
+    #            coord = i * n_dimensions + ax
+    #            print(neg_f[coord])
+    #with gil:
+    #    print("machine_epsilon: ", MACHINE_EPSILON)
+    #    print("sumQ: ", sQ)
+    #    print("neg_fs: ", MACHINE_EPSILON)
+    #    for i in range(0, n_samples):
+    #        for ax in range(n_dimensions):
+    #            coord = i * n_dimensions + ax
+    #            print(neg_f[coord])
 
     free(neg_f)
     free(pos_f)
     return error
-
 
 #######################################
 # Exact (GPU accelerated)
@@ -1103,7 +1126,10 @@ cdef double exact_compute_gradient_gpu(float[:] timings,
     t2 = clock()
 
     #print("applying forces took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    #with gil:
     #print("machine_epsilon: ", MACHINE_EPSILON)
+    #print("sumQ: ", sQ)
+    #print("neg_fs: ", MACHINE_EPSILON)
     #for i in range(0, n_samples):
     #    for ax in range(n_dimensions):
     #        coord = i * n_dimensions + ax
@@ -1124,7 +1150,8 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
                             long start,
                             long stop,
                             bint compute_error,
-                            int num_threads):
+                            int num_threads,
+                            int grid_n):
     # Having created the tree, calculate the gradient
     # in two components, the positive and negative forces
     cdef:
@@ -1143,12 +1170,12 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
 
     t1 = clock()
 
-    neg_f, sQ = uniform_grid_compute_gradient_negative_gpu(start, pos_reference, qt.n_dimensions, n_samples)
+    neg_f, sQ = uniform_grid_compute_gradient_negative_gpu(start, pos_reference, qt.n_dimensions, n_samples, grid_n)
 
     
     t2 = clock()
 
-    #print("neg_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    #print("[UG] neg_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1167,7 +1194,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
     
     t2 = clock()
 
-    #print("pos_f took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    #print("[UG] pos_f: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
 
     if TAKE_TIMING:
         t2 = clock()
@@ -1183,7 +1210,7 @@ cdef double uniform_grid_compute_gradient_gpu(float[:] timings,
 
     t2 = clock()
 
-    #print("applying forces took ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
+    #print("[UG] applying forces: ", (((float) (t2 - t1)) / CLOCKS_PER_SEC), "s")
     #print("machine_epsilon: ", MACHINE_EPSILON)
     #for i in range(0, n_samples):
     #    for ax in range(n_dimensions):
@@ -1471,7 +1498,9 @@ def gradient(float[:] timings,
              int num_threads=1,
              bint exact=1,
              bint area_split=0,
-             bint grad_fix=0):
+             bint grad_fix=0,
+             int uniform_grid_n=16,
+             bint use_uniform_grid=1):
     cdef double C
     cdef int n
     cdef _QuadTree qt = _QuadTree(pos_output.shape[1], verbose)
@@ -1488,6 +1517,9 @@ def gradient(float[:] timings,
     #print("pos shape: ", positions_arr.shape)
     #print("pos min: ", np.min(positions_arr))
     #print("pos max: ", np.max(positions_arr))
+
+    #print("uniform_grid_n=", uniform_grid_n)
+    #print("use_uniform_grid=", use_uniform_grid)
 
     #gpu_init()
 
@@ -1512,13 +1544,26 @@ def gradient(float[:] timings,
     if TAKE_TIMING:
         t1 = clock()
     if exact:
-        C = exact_compute_gradient_gpu(timings, val_P, pos_output, neighbors, indptr, forces,
-                             qt, theta, dof, skip_num_points, -1, compute_error,
-                             num_threads)
+        if use_uniform_grid:
+            C = exact_compute_gradient_gpu(timings, val_P, pos_output, neighbors, indptr, forces,
+                                qt, theta, dof, skip_num_points, -1, compute_error,
+                                num_threads)
+        else:
+            C = exact_compute_gradient(timings, val_P, pos_output, neighbors, indptr, forces,
+                                    qt, theta, dof, skip_num_points, -1, compute_error,
+                                    num_threads)
     else:
-        C = uniform_grid_compute_gradient_gpu(timings, val_P, pos_output, neighbors, indptr, forces,
-                             qt, theta, dof, skip_num_points, -1, compute_error,
-                             num_threads)
+        if use_uniform_grid:
+            C = uniform_grid_compute_gradient_gpu(timings, val_P, pos_output, neighbors, indptr, forces,
+                                qt, theta, dof, skip_num_points, -1, compute_error,
+                                num_threads, uniform_grid_n)
+        else:
+            # only required when using quadtree
+            qt.build_tree(pos_output)
+            C = compute_gradient(timings, val_P, pos_output, neighbors, indptr, forces,
+                                qt, theta, dof, skip_num_points, -1, compute_error,
+                                num_threads)
+
     if TAKE_TIMING:
         t2 = clock()
         timings[1] = ((float) (t2 - t1)) / CLOCKS_PER_SEC

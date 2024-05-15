@@ -5,6 +5,8 @@
 
 cimport numpy as np
 import numpy as np
+import time
+include "grid_gen_gpu.py"
 from libc.stdlib cimport malloc, free
 from libc.math cimport sqrt, log, acosh, cosh, cos, sin, M_PI, atan2, tanh, atanh, isnan, fabs, fmin, fmax
 
@@ -14,6 +16,9 @@ cdef double EPSILON = 0.0
 cdef double BOUNDARY = 1 - EPSILON
 cdef double MACHINE_EPSILON = np.finfo(np.double).eps
 
+def get_current_time():
+    return time.time() * 1000.0
+
 cdef double clamp(double n, double lower, double upper) nogil:
     cdef double t = lower if n < lower else n
     return upper if t > upper else t
@@ -22,12 +27,14 @@ def py_divide_points_over_grid(points, n):
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
     cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(num_points, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=2] new_points = np.empty(points.shape, dtype=np.float64)
+    cdef np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point = np.empty(num_points, dtype=np.int32)
     cdef np.ndarray[np.int32_t, ndim=1] result_starts_counts = np.empty((grid_size * 2), dtype=np.int32)
     cdef np.ndarray[np.float64_t, ndim=1] max_distances = np.empty(grid_size, dtype=np.float64)
     cdef np.ndarray[np.float64_t, ndim=1] square_positions = np.zeros((grid_size * 2), dtype=np.float64)
     cdef double x_min, width, y_min, height
-    c_divide_points_over_grid(points, n, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
-    return result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
+    c_divide_points_over_grid(points, new_points, n, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
+    return new_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
 
 def py_poincare_to_euclidean(x, y):
     cdef double ex, ey
@@ -49,14 +56,21 @@ def py_euclidean_to_poincare(x, y):
 #
 #
 
+cdef void poincare_to_klein(double px, double py, double* kx, double* ky):
+    cdef double denominator = 1.0 + px*px + py*py
+    kx[0] = 2.0 * px / denominator
+    ky[0] = 2.0 * py / denominator
+    return
 
-cdef double er_to_hr(double er):
-    return acosh(1 + 2 * er * er / (1 - er * er + MACHINE_EPSILON))
+cdef void klein_to_poincare(double kx, double ky, double* px, double* py):
+    cdef double denominator = 1.0 + np.sqrt(1.0 - kx*kx - ky*ky)
+    px[0] = kx / denominator
+    py[0] = ky / denominator
+    return
 
-cdef double hr_to_er(double hr):
-    cdef double ch = cosh(hr)
-
-    return sqrt((ch - 1) / (ch + 1))
+cdef double gamma(double v0, double v1):
+    cdef double norm_v_sq = v0 * v0 + v1 * v1
+    return 1.0 / np.sqrt(1.0 - norm_v_sq)
 
 cdef void poincare_to_euclidian(double x, double y, double* ox, double* oy):
     if (x == 0.0 and y == 0.0):
@@ -64,18 +78,10 @@ cdef void poincare_to_euclidian(double x, double y, double* ox, double* oy):
         oy[0] = 0.0
         return
 
-    
-
     cdef double r = np.sqrt(x*x + y*y)
     ox[0] = (1.0 * x) / (1.0 - r)
     oy[0] = (1.0 * y) / (1.0 - r)
     return
-
-
-    cdef double new_r = hr_to_er(r)
-
-    ox[0] = (2.0 * x / r) * new_r
-    oy[0] = (2.0 * y / r) * new_r
 
 cdef void euclidean_to_poincare(double x, double y, double* ox, double* oy):
     if (x == 0.0 and y == 0.0):
@@ -87,12 +93,6 @@ cdef void euclidean_to_poincare(double x, double y, double* ox, double* oy):
     ox[0] = (1.0 * x) / (1.0 + r)
     oy[0] = (1.0 * y) / (1.0 + r)
     return
-
-
-    cdef double new_r = er_to_hr(r)
-
-    ox[0] = (2.0 * x / r) * new_r
-    oy[0] = (2.0 * y / r) * new_r
 
 
 cpdef double distance(double u0, double u1, double v0, double v1):
@@ -151,7 +151,31 @@ cdef double max_distance_in_grid_square(int grid_x, int grid_y, double grid_widt
 
     return max_dist
 
-cdef void c_divide_points_over_grid(double[:,:] points, int n,
+
+def reverse_reorder_array_inplace_py(original_array, result_indices):
+    reverse_reorder_array_inplace(original_array, result_indices)
+    #return
+
+cdef void reverse_reorder_array_inplace(np.ndarray[np.float64_t, ndim=1] original_array, np.ndarray[np.int32_t, ndim=1] result_indices):
+    cdef int num_elements = result_indices.shape[0]
+    cdef np.ndarray[np.float64_t, ndim=1] temp_array = np.empty_like(original_array)
+
+    cdef int i
+
+    # Copy original array to temporary array
+    for i in range(num_elements):
+        temp_array[i*2+0] = original_array[i*2+0]
+        temp_array[i*2+1] = original_array[i*2+1]
+
+    # Reorder the original array according to result_indices
+    for i in range(num_elements):
+        original_array[result_indices[i]*2+0] = temp_array[i*2+0]
+        original_array[result_indices[i]*2+1] = temp_array[i*2+1]
+
+
+
+cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t, ndim=2] new_points, int n,
+        np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point,
         np.ndarray[np.int32_t, ndim=1] result_indices,
         np.ndarray[np.int32_t, ndim=1] result_starts_counts,
         np.ndarray[np.float64_t, ndim=1] max_distances,
@@ -163,9 +187,13 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
     #cdef int[:, :] grid_indices = np.empty((n, n), dtype=np.int32)
     cdef int i, j, k, index
     cdef double x, y
+
+    #print("[GRID] start")
     
+    start_time = get_current_time()
+
     # Steps of this algorithm:
-    # 1. decide for each point which grid square index it belongs to (saved into indices)
+    # 1. decide for each point which grid square index it belongs to (saved into grid_square_indices_per_point)
     # 2. find for each grid square how many members it has (grid_counts)
     # 3. using the member count to find the start index int he final array for each grid square
     # 4. using these values as the start values, fill the final result indices array
@@ -176,7 +204,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
     # ======= STEP 1 =======
     
-    cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
+    #cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
     cdef double dist = 0.0
     cdef double ex, ey
 
@@ -188,6 +216,13 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
     height[0] = y_max - y_min[0]
     grid_width_x = width[0] / n
     grid_width_y = height[0] / n
+
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Init: ", execution_time, "ms")
+
+    start_time = get_current_time()
 
     for p in range(num_points):
         x = points[p, 0] # valid
@@ -205,7 +240,8 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
             index = grid_size-1
         
 
-        indices[p] = index # valid
+        grid_square_indices_per_point[p] = index # valid
+
 
         # TODO: calculate max distance in square from center
         #dist = max_distance_in_grid_square(i, j, grid_width_x, grid_width_y, x, y, x_min[0], width[0], y_min[0], height[0])
@@ -213,12 +249,19 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         #if (dist > max_distances[index]):
         #    max_distances[index] = dist
 
-        poincare_to_euclidian(x, y, &ex, &ey)
-        square_positions[index*2 + 0] += ex
-        square_positions[index*2 + 1] += ey
+        #poincare_to_euclidian(x, y, &ex, &ey)
+        #square_positions[index*2 + 0] += x
+        #square_positions[index*2 + 1] += y
 
+
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Indices: ", execution_time, "ms")
 
     # ======= STEP 2 =======
+
+    start_time = get_current_time()
 
     cdef int* grid_counts = <int*>malloc(sizeof(int) * grid_size)
 
@@ -228,12 +271,19 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
 
     # Counting the members
     for p in range(num_points):
-        index = indices[p]
+        index = grid_square_indices_per_point[p]
 
         grid_counts[index] += 1
 
 
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Counts: ", execution_time, "ms")
+
     # ======= STEP 3 =======
+
+    start_time = get_current_time()
 
     cdef int* grid_start_indices = <int*>malloc(sizeof(int) * grid_size)
     cdef int current_start_index = 0
@@ -246,31 +296,82 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         grid_start_indices[i] = current_start_index
         current_start_index += grid_counts[i]
 
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Starts, counts: ", execution_time, "ms")
 
     # ======= STEP 4 =======
 
-    for p in range(num_points):
-        index = indices[p] # valid
+    start_time = get_current_time()
 
-        # Moving the current pointer over
+    for p in range(num_points):
+        # Finding the grid square this point belongs to
+        index = grid_square_indices_per_point[p] # valid
+
+        # Then finding the pointer into the result_indices array (holds the indices per grid square)
         result_index = grid_start_indices[index]
 
+        # Moving the current pointer over
         result_indices[result_index] = p
         grid_start_indices[index] += 1
 
 
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Starts, counts: ", execution_time, "ms")
+
     # ======= STEP 5 =======
+
+    start_time = get_current_time()
+
+    #cdef double point_klein_x = 0.0
+    #cdef double point_klein_y = 0.0
+    cdef double point_poincare_x = 0.0
+    cdef double point_poincare_y = 0.0
+    #cdef double gamma_sum = 0.0
+
+    #cdef np.ndarray[np.float64_t, ndim=1] mids = np.empty(grid_size*2, dtype=np.float64)
+    #cdef np.ndarray[np.float64_t, ndim=1] gs = np.empty(grid_size, dtype=np.float64)
+    #cdef int grid_index = 0
+    #cdef double g = 0.0
+
+    #for i in range(num_points):
+    #    grid_index = grid_square_indices_per_point[i]
+    #    poincare_to_klein(points[i, 0], points[i, 1], &point_klein_x, &point_klein_y)
+    #    g = gamma(point_klein_x, point_klein_y)
+    #    mids[grid_index*2+0] += g * point_klein_x
+    #    mids[grid_index*2+1] += g * point_klein_y
+    #    gs[grid_index] += g
+
+    mids, gs = calculate_average_grid_square_positions_gpu(points, num_points, n, grid_square_indices_per_point)
+
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Average positions p1: ", execution_time, "ms")
+    
+    start_time = get_current_time()
 
     # Calculating the average position of each square
     for i in range(grid_size):
         if (grid_counts[i] == 0):
             continue
-            
-        euclidean_to_poincare(square_positions[i*2 + 0] / grid_counts[i], square_positions[i*2 + 1] / grid_counts[i], &ex, &ey)
-        square_positions[i*2 + 0] = ex
-        square_positions[i*2 + 1] = ey
+
+        klein_to_poincare(mids[i*2+0] / gs[i], mids[i*2+1] / gs[i], &point_poincare_x, &point_poincare_y)
+        
+        square_positions[i*2 + 0] = point_poincare_x
+        square_positions[i*2 + 1] = point_poincare_y
     
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] Average positions p2: ", execution_time, "ms")
+
     # ======= STEP 6 ========
+
+    start_time = get_current_time()
     
     for p in range(num_points):
         x = points[p, 0] # valid
@@ -293,10 +394,31 @@ cdef void c_divide_points_over_grid(double[:,:] points, int n,
         #dist = distance(0.0, 0.0, x, y)
         if (dist > max_distances[index]):
             max_distances[index] = dist
+    
+    end_time = get_current_time()
 
+    execution_time = end_time - start_time
+    #print("[GRID] Max distances: ", execution_time, "ms")
+
+
+    # ======= STEP 7 =======
+
+    start_time = get_current_time()
+
+    # Reorder the points array according to the indices in the result_indices array
+    #for i in range(num_points):
+    #    new_points[i] = points[result_indices[i]]
+    
+    end_time = get_current_time()
+
+    execution_time = end_time - start_time
+    #print("[GRID] new points: ", execution_time, "ms")
+
+    #for i in range(num_points):
+    #    points[i, 0] = new_points[i, 0]
+    #    points[i, 1] = new_points[i, 1]
 
     # Free memory for temporary arrays
-    free(indices)
     free(grid_counts)
     free(grid_start_indices)
 

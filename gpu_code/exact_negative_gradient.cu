@@ -64,7 +64,7 @@ __device__ double distance_grad(double u0, double u1, double v0, double v1, int 
 __global__ void add(int start, int n_samples, int n_dimensions, double *pos, double *neg_f, double *sumQ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i > n_samples) {
+    if (i < start || i >= n_samples) {
         return;
     }
 
@@ -72,7 +72,9 @@ __global__ void add(int start, int n_samples, int n_dimensions, double *pos, dou
     double dij = 0.0;
     double dij_sq = 0.0;
     double thread_sQ = 0.0;
-
+    
+    // Kahan summation variable
+    //double c = 0.0;
     
     for (int j = start; j < n_samples; j++) {
         if (i == j) {
@@ -85,6 +87,12 @@ __global__ void add(int start, int n_samples, int n_dimensions, double *pos, dou
         qij = 1.0 / (1.0 + dij_sq);
 
         double mult = qij * qij;
+
+        // Implementation of the Kahan Summation algorithm for decreasing floating point errors (https://en.wikipedia.org/wiki/Kahan_summation_algorithm)
+        //double y = qij - c;
+        //double t = thread_sQ + y;
+        //c = (t - thread_sQ) - y;
+        //thread_sQ = t;
 
         thread_sQ += qij;
         for (int ax = 0; ax < n_dimensions; ax++) {

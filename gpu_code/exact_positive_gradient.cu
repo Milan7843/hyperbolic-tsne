@@ -73,7 +73,10 @@ __global__ void add(int start, int n_samples, int n_dimensions, double sum_Q, do
     double qij = 0.0;
     double dij = 0.0;
     double dij_sq = 0.0;
-
+    //for (int ax = 0; ax < n_dimensions; ax++) {
+    //    pos_f[i * n_dimensions + ax] += 1.0;
+    //}
+    
     for (long k = indptr[i]; k < indptr[i+1]; k++) {
         long j = neighbors[k];
         double pij = val_P[k];
@@ -83,7 +86,7 @@ __global__ void add(int start, int n_samples, int n_dimensions, double sum_Q, do
 
         qij = 1.0 / (1.0 + dij_sq);
 
-        double mult = qij * qij;
+        double mult = pij * qij;
 
 
         if (true) {

@@ -32,7 +32,7 @@ def check_params(params):
     if params["params"] is not None and not isinstance(params["params"], dict):
         raise TypeError("`params` should be either None or a dict with the appropriate setup parameters")
 
-    general_params = ["num_threads", "verbose", "degrees_of_freedom", "calc_both", "area_split", "grad_fix"]
+    general_params = ["num_threads", "verbose", "degrees_of_freedom", "calc_both", "area_split", "grad_fix", "use_uniform_grid", "uniform_grid_n"]
     if params["method"] == "exact":
         all_params = general_params + ["skip_num_points"]
     elif params["method"] == "barnes-hut":
@@ -264,7 +264,9 @@ class HyperbolicKL:
             compute_error=True,
             num_threads=self.params["params"]["num_threads"],
             exact=True,
-            grad_fix=self.params["params"]["grad_fix"]
+            grad_fix=self.params["params"]["grad_fix"],
+            uniform_grid_n=self.params["params"]["uniform_grid_n"],
+            use_uniform_grid=self.params["params"]["use_uniform_grid"]
         )
 
         grad = grad.ravel()
@@ -335,7 +337,9 @@ class HyperbolicKL:
             num_threads=self.params["params"]["num_threads"],
             exact=False,
             area_split=self.params["params"]["area_split"],
-            grad_fix=self.params["params"]["grad_fix"]
+            grad_fix=self.params["params"]["grad_fix"],
+            uniform_grid_n=self.params["params"]["uniform_grid_n"],
+            use_uniform_grid=self.params["params"]["use_uniform_grid"]
         )
 
         grad = grad.ravel()
