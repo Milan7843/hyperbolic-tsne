@@ -406,7 +406,15 @@ def load_data(dataset, data_home=None, to_return='all', pca_components=100,
 
     # Setup sample
     sample_idx = None
-    if sample <= 0:
+    if sample == 0: # Take all samples
+        sample_data = True
+        sample = raw_X.shape[0]
+        # Generate sample
+        raw_idx = np.arange(raw_X.shape[0])
+        sample_idx = np.sort(np.random.choice(raw_idx, size=sample, replace=False))  # uniformly sampled
+        X = raw_X[sample_idx].copy()
+        labels = raw_labels[sample_idx].copy()
+    elif sample <= 0:
         sample_data = False
         X, labels = raw_X, raw_labels
     else:
