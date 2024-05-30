@@ -4,6 +4,10 @@ from pycuda.compiler import SourceModule
 import numpy as np
 import time
 
+# Relative path from your code to the root of the project
+# Leave blank if your code is already in the root
+relative_path = "../"
+
 calculate_average_grid_square_positions_gpu_func = None
 pos_gpu = None
 mids_gpu = None
@@ -16,7 +20,7 @@ def get_calculate_average_grid_square_positions_gpu_func():
     global calculate_average_grid_square_positions_gpu_func
 
     if (calculate_average_grid_square_positions_gpu_func == None):
-        with open("gpu_code/calculate_average_grid_square_positions.cu", "r") as file:
+        with open(relative_path + "gpu_code/calculate_average_grid_square_positions.cu", "r") as file:
             cuda_kernel = file.read()
 
         # Compile the CUDA kernel

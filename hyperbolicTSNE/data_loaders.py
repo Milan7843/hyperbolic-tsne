@@ -34,6 +34,7 @@ class Datasets(Enum):
     LUKK = auto()  # DONE
     MYELOID8000 = auto()  # DONE
     WORDNET = auto()  # DONE
+    AMAZON = auto()
 
 
 def load_mnist(data_home=None, return_X_y=True, kind='all'):
@@ -321,9 +322,43 @@ def load_lukk(data_home, return_X_y=True):
         return X
 
 
+def load_amazon(data_home, return_X_y=True):
+    """
+    Loads AMAZON data.
+
+    Parameters
+    __________
+    data_home : str, optional
+        Locations of the folder where the datasets are stored.
+    return_X_y: bool, optional
+        If True, method only returns tuple with the data and its labels.
+    """
+
+    # Use default location
+    if data_home is None:
+        data_home = Path.joinpath(Path(__file__).parent, "datasets")
+    else:
+        data_home = Path(str(data_home))  # quick fix to deal with incoming os.paths
+
+    full_path = Path.joinpath(data_home, "amazon3m")
+    data_path = str(Path.joinpath(full_path, "amazon_data.txt"))
+
+    X = np.loadtxt(data_path, delimiter=' ', usecols=np.arange(100))
+
+    labels_str = np.loadtxt(str(Path.joinpath(full_path, "amazon_label.txt")), delimiter=" ", dtype=str)
+
+    _, labels = np.unique(labels_str, return_inverse=True)
+
+    if return_X_y:
+        return X, labels
+    else:
+        return X
+
 def _load_dataset(dataset, data_home=None, verbose=False, **kwargs):
     X = None
     labels = None
+
+    print(f"Loading {dataset} from {data_home}")
     if verbose:
         print("[Data Loader] Preparing to load the dataset")
     start = time.time()
@@ -341,6 +376,8 @@ def _load_dataset(dataset, data_home=None, verbose=False, **kwargs):
         X, labels = load_lukk(data_home, **kwargs)
     if dataset == Datasets.WORDNET:
         X, labels = load_wordnet(data_home, **kwargs)
+    if dataset == Datasets.AMAZON:
+        X, labels = load_amazon(data_home, **kwargs)
     end = time.time()
     if verbose:
         print("[Data Loader] Data has been loaded and it took {}".format(end - start))

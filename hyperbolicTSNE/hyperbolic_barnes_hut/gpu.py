@@ -5,6 +5,10 @@ import numpy as np
 import time
 from . import uniform_grid
 
+# Relative path from your code to the root of the project
+# Leave blank if your code is already in the root
+relative_path = "../"
+
 exact_compute_gradient_negative_gpu_func = None
 exact_compute_gradient_positive_gpu_func = None
 ugrid_compute_gradient_negative_gpu_func = None
@@ -24,7 +28,7 @@ def get_exact_compute_gradient_negative_gpu_func():
     global exact_compute_gradient_negative_gpu_func
 
     if (exact_compute_gradient_negative_gpu_func == None):
-        with open("gpu_code\exact_negative_gradient.cu", "r") as file:
+        with open(relative_path + "gpu_code\exact_negative_gradient.cu", "r") as file:
             cuda_kernel = file.read()
 
         # Compile the CUDA kernel
@@ -39,7 +43,7 @@ def get_exact_compute_gradient_positive_gpu_func():
     global exact_compute_gradient_positive_gpu_func
 
     if (exact_compute_gradient_positive_gpu_func == None):
-        with open("gpu_code\exact_positive_gradient.cu", "r") as file:
+        with open(relative_path + "gpu_code\exact_positive_gradient.cu", "r") as file:
             cuda_kernel = file.read()
 
         # Compile the CUDA kernel
@@ -54,7 +58,7 @@ def get_ugrid_compute_gradient_negative_gpu_func():
     global ugrid_compute_gradient_negative_gpu_func
 
     if (ugrid_compute_gradient_negative_gpu_func == None):
-        with open("gpu_code/u_grid_negative_gradient.cu", "r") as file:
+        with open(relative_path + "gpu_code/u_grid_negative_gradient.cu", "r") as file:
             cuda_kernel = file.read()
 
         # Compile the CUDA kernel
@@ -70,7 +74,7 @@ def get_u_grid_ownsquareonly_compute_gradient_negative_gpu_func():
     global u_grid_ownsquareonly_compute_gradient_negative_gpu_func
 
     if (u_grid_ownsquareonly_compute_gradient_negative_gpu_func == None):
-        with open("gpu_code/u_grid_ownsquareonly_negative_gradient.cu", "r") as file:
+        with open(relative_path + "gpu_code/u_grid_ownsquareonly_negative_gradient.cu", "r") as file:
             cuda_kernel = file.read()
 
         # Compile the CUDA kernel
@@ -195,7 +199,9 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     start_time = time.time()
     grid_size = grid_n*grid_n
     #print(pos_reference)
-    reordered_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
+    #reordered_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
+
+    result_starts_counts, square_positions, x_min, width, y_min, height = uniform_grid.py_divide_points_over_grid(pos_reference, grid_n)
 
     #print(pos_reference)
     end_time = time.time()
@@ -209,11 +215,11 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
         pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
         negf_gpu = cuda.mem_alloc(neg_f.nbytes)
         sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
-        result_indices_gpu = cuda.mem_alloc(result_indices.nbytes)
+        #result_indices_gpu = cuda.mem_alloc(result_indices.nbytes)
         result_starts_counts_gpu = cuda.mem_alloc(result_starts_counts.nbytes)
-        max_distances_gpu = cuda.mem_alloc(max_distances.nbytes)
+        #max_distances_gpu = cuda.mem_alloc(max_distances.nbytes)
         square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
-        grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
+        #grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
         saved_num_points = n_samples
         saved_ugrid_n = grid_n
 
@@ -232,9 +238,9 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     # p = num points
     #cuda.memcpy_htod(result_indices_gpu, result_indices) # p * 4 bytes
     cuda.memcpy_htod(result_starts_counts_gpu, result_starts_counts) # p * 4 bytes
-    cuda.memcpy_htod(max_distances_gpu, max_distances) # g * 2 * 4 bytes
+    #cuda.memcpy_htod(max_distances_gpu, max_distances) # g * 2 * 4 bytes
     cuda.memcpy_htod(square_positions_gpu, square_positions) # g * 8 bytes
-    cuda.memcpy_htod(grid_square_indices_per_point_gpu, grid_square_indices_per_point) # g * 2 * 8 bytes
+    #cuda.memcpy_htod(grid_square_indices_per_point_gpu, grid_square_indices_per_point) # g * 2 * 8 bytes
 
     end_time = time.time()
 

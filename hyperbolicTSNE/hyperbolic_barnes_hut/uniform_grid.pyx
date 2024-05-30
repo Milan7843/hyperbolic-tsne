@@ -34,7 +34,7 @@ def py_divide_points_over_grid(points, n):
     cdef np.ndarray[np.float64_t, ndim=1] square_positions = np.zeros((grid_size * 2), dtype=np.float64)
     cdef double x_min, width, y_min, height
     c_divide_points_over_grid(points, new_points, n, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, &x_min, &width, &y_min, &height)
-    return new_points, grid_square_indices_per_point, result_indices, result_starts_counts, max_distances, square_positions, x_min, width, y_min, height
+    return result_starts_counts, square_positions, x_min, width, y_min, height
 
 def py_poincare_to_euclidean(x, y):
     cdef double ex, ey
@@ -373,27 +373,27 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
 
     start_time = get_current_time()
     
-    for p in range(num_points):
-        x = points[p, 0] # valid
-        y = points[p, 1] # valid
+    #for p in range(num_points):
+    #    x = points[p, 0] # valid
+    #    y = points[p, 1] # valid
 
-        i = int((x - x_min[0]) / grid_width_x)
-        j = int((y - y_min[0]) / grid_width_y)
+    #    i = int((x - x_min[0]) / grid_width_x)
+    #    j = int((y - y_min[0]) / grid_width_y)
 
-        index = i * n + j
+    #    index = i * n + j
 
-        if (index < 0):
-            index = 0
+    #    if (index < 0):
+    #        index = 0
         
-        if (index >= grid_size):
-            index = grid_size-1
+    #    if (index >= grid_size):
+    #        index = grid_size-1
 
-        # TODO: calculate max distance in square from center
-        dist = distance(x, y, square_positions[index*2 + 0], square_positions[index*2 + 1])
+    #    # TODO: calculate max distance in square from center
+    #    dist = distance(x, y, square_positions[index*2 + 0], square_positions[index*2 + 1])
 
-        #dist = distance(0.0, 0.0, x, y)
-        if (dist > max_distances[index]):
-            max_distances[index] = dist
+    #    #dist = distance(0.0, 0.0, x, y)
+    #    if (dist > max_distances[index]):
+    #        max_distances[index] = dist
     
     end_time = get_current_time()
 
