@@ -1513,23 +1513,6 @@ def gradient(float[:] timings,
     GRAD_FIX = grad_fix
 
 
-    #positions_arr = np.asarray(pos_output)
-    #print("pos shape: ", positions_arr.shape)
-    #print("pos min: ", np.min(positions_arr))
-    #print("pos max: ", np.max(positions_arr))
-
-    #print("uniform_grid_n=", uniform_grid_n)
-    #print("use_uniform_grid=", use_uniform_grid)
-
-    #gpu_init()
-
-
-
-    # ========= TESTING ==========
-    #print("TEST: distance_grad(0.1, -0.1, 0.3, 0.5, 0) = ", distance_grad(0.1, -0.1, 0.3, 0.5, 0))
-
-
-
 
     #if not exact:
     #    if TAKE_TIMING:

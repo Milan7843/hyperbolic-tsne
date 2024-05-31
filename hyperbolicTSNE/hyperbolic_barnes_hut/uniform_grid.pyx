@@ -46,16 +46,6 @@ def py_euclidean_to_poincare(x, y):
     euclidean_to_poincare(x, y, &px, &py)
     return px, py
 
-# r = (px^2 + py^2)
-# ex = 2px / (1 - r)
-# ey = 2py / (1 - r)
-#
-#
-#
-#
-#
-#
-
 cdef void poincare_to_klein(double px, double py, double* kx, double* ky):
     cdef double denominator = 1.0 + px*px + py*py
     kx[0] = 2.0 * px / denominator
@@ -184,7 +174,6 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
     cdef double grid_width_x, grid_width_y
-    #cdef int[:, :] grid_indices = np.empty((n, n), dtype=np.int32)
     cdef int i, j, k, index
     cdef double x, y
 
@@ -193,18 +182,16 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     start_time = get_current_time()
 
     # Steps of this algorithm:
-    # 1. decide for each point which grid square index it belongs to (saved into grid_square_indices_per_point)
-    # 2. find for each grid square how many members it has (grid_counts)
-    # 3. using the member count to find the start index int he final array for each grid square
-    # 4. using these values as the start values, fill the final result indices array
+    # 1. Setup variables
+    # 2. Find for each point the grid square it belongs to
+    # 3. Count the number of members in each grid cell
+    # 4. Setting the grid start and count values based on the number of points the grid cells hold
+    # 5. Filling the array that holds the indices for each grid cell
+    # 6. Calculating the mean of each grid cell
 
-    # Initialise the max distances at 0
-    for i in range(grid_size):
-        max_distances[i] = 0.0
 
-    # ======= STEP 1 =======
+    # ======= Step 1: Setup variables =======
     
-    #cdef int* indices = <int*>malloc(sizeof(int) * num_points) # = [0, grid_size-1]
     cdef double dist = 0.0
     cdef double ex, ey
 
@@ -224,9 +211,12 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
 
     start_time = get_current_time()
 
+
+    # ======= Step 2: Find for each point the grid square it belongs to =======
+
     for p in range(num_points):
-        x = points[p, 0] # valid
-        y = points[p, 1] # valid
+        x = points[p, 0]
+        y = points[p, 1]
 
         i = int((x - x_min[0]) / grid_width_x)
         j = int((y - y_min[0]) / grid_width_y)
@@ -240,18 +230,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
             index = grid_size-1
         
 
-        grid_square_indices_per_point[p] = index # valid
-
-
-        # TODO: calculate max distance in square from center
-        #dist = max_distance_in_grid_square(i, j, grid_width_x, grid_width_y, x, y, x_min[0], width[0], y_min[0], height[0])
-        #dist = distance(0.0, 0.0, x, y)
-        #if (dist > max_distances[index]):
-        #    max_distances[index] = dist
-
-        #poincare_to_euclidian(x, y, &ex, &ey)
-        #square_positions[index*2 + 0] += x
-        #square_positions[index*2 + 1] += y
+        grid_square_indices_per_point[p] = index
 
 
     end_time = get_current_time()
@@ -259,7 +238,8 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     execution_time = end_time - start_time
     #print("[GRID] Indices: ", execution_time, "ms")
 
-    # ======= STEP 2 =======
+
+    # ======= Step 3: Count the number of members in each grid cell =======
 
     start_time = get_current_time()
 
@@ -281,7 +261,8 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     execution_time = end_time - start_time
     #print("[GRID] Counts: ", execution_time, "ms")
 
-    # ======= STEP 3 =======
+
+    # ======= Step 4: Setting the grid start and count values based on the number of points the grid cells hold =======
 
     start_time = get_current_time()
 
@@ -301,13 +282,14 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     execution_time = end_time - start_time
     #print("[GRID] Starts, counts: ", execution_time, "ms")
 
-    # ======= STEP 4 =======
+
+    # ======= Step 5: Filling the array that holds the indices for each grid cell =======
 
     start_time = get_current_time()
 
     for p in range(num_points):
         # Finding the grid square this point belongs to
-        index = grid_square_indices_per_point[p] # valid
+        index = grid_square_indices_per_point[p]
 
         # Then finding the pointer into the result_indices array (holds the indices per grid square)
         result_index = grid_start_indices[index]
@@ -322,28 +304,13 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     execution_time = end_time - start_time
     #print("[GRID] Starts, counts: ", execution_time, "ms")
 
-    # ======= STEP 5 =======
+
+    # ======= Step 6: Calculating the mean of each grid cell =======
 
     start_time = get_current_time()
 
-    #cdef double point_klein_x = 0.0
-    #cdef double point_klein_y = 0.0
     cdef double point_poincare_x = 0.0
     cdef double point_poincare_y = 0.0
-    #cdef double gamma_sum = 0.0
-
-    #cdef np.ndarray[np.float64_t, ndim=1] mids = np.empty(grid_size*2, dtype=np.float64)
-    #cdef np.ndarray[np.float64_t, ndim=1] gs = np.empty(grid_size, dtype=np.float64)
-    #cdef int grid_index = 0
-    #cdef double g = 0.0
-
-    #for i in range(num_points):
-    #    grid_index = grid_square_indices_per_point[i]
-    #    poincare_to_klein(points[i, 0], points[i, 1], &point_klein_x, &point_klein_y)
-    #    g = gamma(point_klein_x, point_klein_y)
-    #    mids[grid_index*2+0] += g * point_klein_x
-    #    mids[grid_index*2+1] += g * point_klein_y
-    #    gs[grid_index] += g
 
     mids, gs = calculate_average_grid_square_positions_gpu(points, num_points, n, grid_square_indices_per_point)
 
@@ -354,7 +321,7 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     
     start_time = get_current_time()
 
-    # Calculating the average position of each square
+    # Calculating the mean position of each square
     for i in range(grid_size):
         if (grid_counts[i] == 0):
             continue
@@ -369,56 +336,8 @@ cdef void c_divide_points_over_grid(double[:,:] points, np.ndarray[np.float64_t,
     execution_time = end_time - start_time
     #print("[GRID] Average positions p2: ", execution_time, "ms")
 
-    # ======= STEP 6 ========
 
-    start_time = get_current_time()
-    
-    #for p in range(num_points):
-    #    x = points[p, 0] # valid
-    #    y = points[p, 1] # valid
-
-    #    i = int((x - x_min[0]) / grid_width_x)
-    #    j = int((y - y_min[0]) / grid_width_y)
-
-    #    index = i * n + j
-
-    #    if (index < 0):
-    #        index = 0
-        
-    #    if (index >= grid_size):
-    #        index = grid_size-1
-
-    #    # TODO: calculate max distance in square from center
-    #    dist = distance(x, y, square_positions[index*2 + 0], square_positions[index*2 + 1])
-
-    #    #dist = distance(0.0, 0.0, x, y)
-    #    if (dist > max_distances[index]):
-    #        max_distances[index] = dist
-    
-    end_time = get_current_time()
-
-    execution_time = end_time - start_time
-    #print("[GRID] Max distances: ", execution_time, "ms")
-
-
-    # ======= STEP 7 =======
-
-    start_time = get_current_time()
-
-    # Reorder the points array according to the indices in the result_indices array
-    #for i in range(num_points):
-    #    new_points[i] = points[result_indices[i]]
-    
-    end_time = get_current_time()
-
-    execution_time = end_time - start_time
-    #print("[GRID] new points: ", execution_time, "ms")
-
-    #for i in range(num_points):
-    #    points[i, 0] = new_points[i, 0]
-    #    points[i, 1] = new_points[i, 1]
-
-    # Free memory for temporary arrays
+    # Freeing memory for temporary arrays
     free(grid_counts)
     free(grid_start_indices)
 

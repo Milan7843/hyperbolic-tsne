@@ -19,6 +19,8 @@ saved_grid_n = None
 def get_calculate_average_grid_square_positions_gpu_func():
     global calculate_average_grid_square_positions_gpu_func
 
+    # If the function is not defined yet, define it and then return it
+    # Otherwise, the cached version will just be used
     if (calculate_average_grid_square_positions_gpu_func == None):
         with open(relative_path + "gpu_code/calculate_average_grid_square_positions.cu", "r") as file:
             cuda_kernel = file.read()
@@ -55,6 +57,7 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
 
     start_time = time.time()
 
+    # Allocating memory on the GPU if this wasn't done before, or the space required has changed
     if (saved_num_points == None or saved_num_points != n_samples or saved_grid_n != grid_n):
         pos_gpu = cuda.mem_alloc(points.nbytes)
         mids_gpu = cuda.mem_alloc(mids.nbytes)
@@ -69,7 +72,8 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
 
     start_time = time.time()
 
-    #cuda.memcpy_htod(pos_gpu, reordered_points)
+
+    # Writing data to the GPU memory
     cuda.memcpy_htod(pos_gpu, points)
     cuda.memcpy_htod(mids_gpu, mids)
     cuda.memcpy_htod(gs_gpu, gs)
@@ -85,6 +89,7 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
 
     start_time = time.time()
 
+    # Retrieving the CUDA function for generating the mean grid cell positions
     cuda_func = get_calculate_average_grid_square_positions_gpu_func()
 
     end_time = time.time()
@@ -116,8 +121,6 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
     execution_time = end_time - total_start_time
     #print("[Grid AVG] Total: ", execution_time, "seconds")
 
-    #print("negf: ", neg_f)  # Output: [5 7 9]
-    #print("sumQ: ", sumQ[0])
     return mids, gs
 
 
