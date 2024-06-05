@@ -34,6 +34,15 @@ def get_calculate_average_grid_square_positions_gpu_func():
     
     return calculate_average_grid_square_positions_gpu_func
 
+def free_mem(mem):
+    if mem == None:
+        return
+    
+    try:
+        mem.free()
+    except pycuda._driver.LogicError:
+        return
+    
 def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_square_indices_per_point):
     global pos_gpu
     global mids_gpu
@@ -58,13 +67,27 @@ def calculate_average_grid_square_positions_gpu(points, n_samples, grid_n, grid_
     start_time = time.time()
 
     # Allocating memory on the GPU if this wasn't done before, or the space required has changed
-    if (saved_num_points == None or saved_num_points != n_samples or saved_grid_n != grid_n):
+    if (saved_num_points == None):
         pos_gpu = cuda.mem_alloc(points.nbytes)
         mids_gpu = cuda.mem_alloc(mids.nbytes)
         gs_gpu = cuda.mem_alloc(gs.nbytes)
         grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
         saved_num_points = n_samples
         saved_grid_n = grid_n
+    elif (saved_num_points != n_samples or saved_grid_n != grid_n): # A parameter changed, so memory needs to be freed and then written
+        # Freeing previous memory
+        free_mem(pos_gpu)
+        free_mem(mids_gpu)
+        free_mem(gs_gpu)
+        free_mem(grid_square_indices_per_point_gpu)
+        saved_num_points = n_samples
+        saved_grid_n = grid_n
+
+        # Reallocating
+        pos_gpu = cuda.mem_alloc(points.nbytes)
+        mids_gpu = cuda.mem_alloc(mids.nbytes)
+        gs_gpu = cuda.mem_alloc(gs.nbytes)
+        grid_square_indices_per_point_gpu = cuda.mem_alloc(grid_square_indices_per_point.nbytes)
     
     end_time = time.time()
     execution_time = end_time - start_time

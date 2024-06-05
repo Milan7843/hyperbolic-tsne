@@ -26,11 +26,13 @@ cdef double clamp(double n, double lower, double upper) nogil:
 def py_divide_points_over_grid(points, n):
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
-    cdef np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point = np.empty(num_points, dtype=np.int32)
+    #cdef np.ndarray[np.int32_t, ndim=1] result_indices = np.empty(num_points, dtype=np.int32)
+    cdef np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point = np.empty(2, dtype=np.int32)
     cdef np.ndarray[np.int32_t, ndim=1] result_starts_counts = np.empty((grid_size * 2), dtype=np.int32)
     cdef np.ndarray[np.float64_t, ndim=1] square_positions = np.empty((grid_size * 2), dtype=np.float64)
     cdef double x_min, width, y_min, height
     c_divide_points_over_grid(points, n, grid_square_indices_per_point, result_starts_counts, square_positions, &x_min, &width, &y_min, &height)
+    #del grid_square_indices_per_point
     return result_starts_counts, square_positions, x_min, width, y_min, height
 
 def py_poincare_to_euclidean(x, y):
@@ -163,9 +165,11 @@ cdef void reverse_reorder_array_inplace(np.ndarray[np.float64_t, ndim=1] origina
 
 cdef void c_divide_points_over_grid(double[:,:] points, int n,
         np.ndarray[np.int32_t, ndim=1] grid_square_indices_per_point,
+        #np.ndarray[np.int32_t, ndim=1] result_indices,
         np.ndarray[np.int32_t, ndim=1] result_starts_counts,
         np.ndarray[np.float64_t, ndim=1] square_positions,
         double* x_min, double* width, double* y_min, double* height):
+    
     cdef int num_points = points.shape[0]
     cdef int grid_size = n * n
     cdef double grid_width_x, grid_width_y

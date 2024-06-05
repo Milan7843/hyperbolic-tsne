@@ -23,6 +23,7 @@ square_positions_gpu = None
 grid_square_indices_per_point_gpu = None
 saved_num_points = None
 saved_ugrid_n = None
+#saved_method = None # 0 = exact, 1 = uniform grid
 
 def get_exact_compute_gradient_negative_gpu_func():
     global exact_compute_gradient_negative_gpu_func
@@ -183,6 +184,14 @@ def compute_gradient_positive_gpu(start, pos_reference, n_dimensions, n_samples,
     #print("sq: ", sQ)  # Output: [5 7 9]
     return pos_f, error
 
+def free_mem(mem):
+    if mem == None:
+        return
+    
+    try:
+        mem.free()
+    except pycuda._driver.LogicError:
+        return
 
 def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples, grid_n):
     global pos_gpu
@@ -216,7 +225,7 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
     start_time = time.time()
 
     # Allocating memory on the GPU if this wasn't done before, or the space required has changed
-    if (saved_num_points == None or saved_num_points != n_samples or saved_ugrid_n != grid_n):
+    if (saved_num_points == None):
         pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
         negf_gpu = cuda.mem_alloc(neg_f.nbytes)
         sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
@@ -224,6 +233,22 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
         square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
         saved_num_points = n_samples
         saved_ugrid_n = grid_n
+    elif (saved_num_points != n_samples or saved_ugrid_n != grid_n): # A parameter changed, so memory needs to be freed and then written
+        # Freeing previous memory
+        free_mem(pos_gpu)
+        free_mem(negf_gpu)
+        free_mem(sumQ_gpu)
+        free_mem(result_starts_counts_gpu)
+        free_mem(square_positions_gpu)
+        saved_num_points = n_samples
+        saved_ugrid_n = grid_n
+
+        # Reallocating
+        pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
+        negf_gpu = cuda.mem_alloc(neg_f.nbytes)
+        sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
+        result_starts_counts_gpu = cuda.mem_alloc(result_starts_counts.nbytes)
+        square_positions_gpu = cuda.mem_alloc(square_positions.nbytes)
 
     end_time = time.time()
 
@@ -294,6 +319,10 @@ def uniform_grid_compute_gradient_negative_gpu(start, pos_reference, n_dimension
 
 
 def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_samples):
+    global pos_gpu
+    global negf_gpu
+    global sumQ_gpu
+    global saved_num_points
 
     total_start_time = time.time()
 
@@ -303,10 +332,23 @@ def exact_compute_gradient_negative_gpu(start, pos_reference, n_dimensions, n_sa
 
     start_time = time.time()
 
-    # Convert pos and neg_f to ctypes pointers
-    pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
-    negf_gpu = cuda.mem_alloc(neg_f.nbytes)
-    sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
+    # Allocating memory on the GPU if this wasn't done before, or the space required has changed
+    if (saved_num_points == None):
+        pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
+        negf_gpu = cuda.mem_alloc(neg_f.nbytes)
+        sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
+        saved_num_points = n_samples
+    elif (saved_num_points != n_samples): # A parameter changed, so memory needs to be freed and then written
+        # Freeing previous memory
+        free_mem(pos_gpu)
+        free_mem(negf_gpu)
+        free_mem(sumQ_gpu)
+        saved_num_points = n_samples
+
+        # Reallocating
+        pos_gpu = cuda.mem_alloc(pos_reference.nbytes)
+        negf_gpu = cuda.mem_alloc(neg_f.nbytes)
+        sumQ_gpu = cuda.mem_alloc(sumQ.nbytes)
 
     end_time = time.time()
 

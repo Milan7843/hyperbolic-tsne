@@ -151,13 +151,13 @@ def run(num_points = 1000, exact=False, use_uniform_grid=False, uniform_grid_n=1
     )
 
     start_time = time.time()
-
-    try:
-        hyperbolicEmbedding = htsne.fit_transform((D, V))
-    except ValueError:
-        print("Error!")
-        hyperbolicEmbedding = find_last_embedding(log_path)
-        traceback.print_exc()
+    hyperbolicEmbedding = htsne.fit_transform((D, V))
+    #try:
+    #    hyperbolicEmbedding = htsne.fit_transform((D, V))
+    #except ValueError:
+    #    print("Error!")
+    #    hyperbolicEmbedding = find_last_embedding(log_path)
+    #    traceback.print_exc()
 
     end_time = time.time()
 

@@ -177,7 +177,8 @@ class HyperbolicKL:
         """
         n_samples = V.shape[0]
         if self.params["method"] == "exact":
-            return self._grad_exact(Y, V, n_samples)
+            _, grad = self._grad_exact(Y, V, n_samples)
+            return grad
         elif self.params["method"] == "barnes-hut":
             _, grad = self._grad_bh(Y, V, n_samples)
             return grad
